@@ -1,0 +1,11 @@
+{
+    "input_variables": [
+        "json_schema_code"
+    ],
+    "output_parser": null,
+    "partial_variables": {},
+    "template": "\u4f7f\u7528\u4e0b\u6587\u4e2d\u7ed9\u51fa\u7684 json schema \u4ee3\u7801\u751f\u6210 java pojo \u5bf9\u8c61\uff0cjson schema \u4ee3\u7801\u4f7f\u7528 ### \u5305\u56f4\u3002\u751f\u6210\u7684 java \u5bf9\u8c61\u7684\u5b57\u6bb5\u5e94\u5f53\u4e0e json schema \u5b9a\u4e49\u7684 json \u7ed3\u6784\u5b57\u6bb5\u5b8c\u5168\u4e00\u81f4\u3002\u4e0d\u8981\u548c\u6211\u5bf9\u8bdd\uff0c\u9664\u4e86 java \u4ee3\u7801\u4e4b\u5916\uff0c\u4e0d\u8981\u751f\u6210\u4efb\u4f55\u5176\u4ed6\u5185\u5bb9\u3002\n\n###\n{json_schema_code}\n### \n",
+    "template_format": "f-string",
+    "validate_template": true,
+    "_type": "prompt"
+}

@@ -1,0 +1,12 @@
+{
+    "input_variables": [
+        "class_name",
+        "code"
+    ],
+    "output_parser": null,
+    "partial_variables": {},
+    "template": "print_template('./templates/java_code_to_json.json')\n\u6211\u5c06\u7ed9\u4f60\u4e00\u6bb5 proto \u7c7b\u7684\u5b9a\u4e49\u4ee3\u7801\uff0c\u4ee3\u7801\u7528 ### \u5305\u56f4\u3002\u4f60\u9700\u8981\u8fd4\u56de\u7ed9\u6211\u4e00\u4e2a json \uff0c\u5176\u5bf9\u5e94\u5b57\u6bb5\u548c proto \u4e2d\u5b9a\u4e49\u7684 {class_name} \u7c7b\u4e00\u81f4\u3002\u9664\u4e86 json \u5185\u5bb9\u4e4b\u5916\uff0c\u4e0d\u8981\u8fd4\u56de\u4efb\u4f55\u5176\u4ed6\u5185\u5bb9\u3002\n\n###\n{code}\n###",
+    "template_format": "f-string",
+    "validate_template": true,
+    "_type": "prompt"
+}
