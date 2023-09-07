@@ -33,7 +33,8 @@ def get_gpt_code_answer(page):
     return code_text
 
 
-def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, **kwargs: Any):
+def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, delete_chat=True,
+                      **kwargs: Any):
     find_and_switch_gpt_page(page)
     gpt_page_new_chat(page, prompt.format(**kwargs))
     code_ele = page.ele('css:#__next main div.text-token-text-primary code')
@@ -41,5 +42,6 @@ def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, **kwargs: 
         time.sleep(0.1)
     text = BeautifulSoup(code_ele.html, 'html.parser').get_text()
     code_text = text
-    delete_gpt_latest_chat(page)
+    if delete_chat:
+        delete_gpt_latest_chat(page)
     return code_text
