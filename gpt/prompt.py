@@ -16,22 +16,24 @@ class PromptManagementPage(QWidget):
     def __init__(self):
         super().__init__()
         layout = QHBoxLayout()
-        layout.addLayout(self.text_edit_widget())
-        layout.addLayout(self.operator_box_widget())
+        layout.addLayout(self.template_edit_layout())
+        layout.addLayout(self.operator_box_layout())
         self.setLayout(layout)
 
-    def text_edit_widget(self):
+    def template_edit_layout(self):
         # 左侧内容区
         layout = QVBoxLayout()
         self.text_edit = QTextEdit()
         layout.addWidget(self.text_edit)
         return layout
 
-    def operator_box_widget(self):
+    def operator_box_layout(self):
         layout = QVBoxLayout()
 
         search_box = TemplateFileComboBox()
         search_box.template_selected.connect(self.template_switch)
+        search_box.setCurrentIndex(0)
+        search_box.emit_item_selected(0)
 
         save_button = QPushButton('保存')
         save_button.clicked.connect(self.save_template)
