@@ -4,6 +4,7 @@ from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, \
     QGridLayout, QLayout, QLineEdit
+from jinja2 import TemplateError
 from langchain import BasePromptTemplate
 from langchain.prompts import load_prompt
 
@@ -38,16 +39,13 @@ class CodeGeneratePage(QWidget):
         super().__init__()
         self.chromium_page = ChromiumPage()
 
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
+        main_layout.addLayout(self.question_area())
         layout = QHBoxLayout()
-        layout.addLayout(self.gpt_content_area())
-        layout.addLayout(self.operator_area_widget())
-        self.setLayout(layout)
-
-    def gpt_content_area(self):
-        layout = QVBoxLayout()
-        layout.addLayout(self.question_area())
-        layout.addLayout(self.answer_area())
-        return layout
+        layout.addLayout(self.answer_layout())
+        layout.addLayout(self.operator_layout())
+        main_layout.addLayout(layout)
 
     def question_area(self) -> QLayout:
         layout1 = QVBoxLayout()
@@ -66,17 +64,18 @@ class CodeGeneratePage(QWidget):
         main_layout.addLayout(layout2)
         return main_layout
 
-    def answer_area(self):
+    def answer_layout(self):
         layout = QVBoxLayout()
         layout.addWidget(QLabel('回答代码'))
         self.answer_editor = QTextEdit(self)
         layout.addWidget(self.answer_editor)
         return layout
 
-    def operator_area_widget(self):
+    def operator_layout(self):
         search_box = TemplateFileComboBox()
         search_box.template_selected.connect(self.template_switch)
         search_box.setCurrentIndex(0)
+        search_box.emit_item_selected(0)
 
         submit_button = QPushButton('生成代码')
         submit_button.clicked.connect(self.submit_question)
@@ -102,7 +101,11 @@ class CodeGeneratePage(QWidget):
     def update_variables_layout(self):
         template = self.template_editor.toPlainText()
         if not self.curr_prompt or self.curr_prompt.template != template:
-            self.curr_prompt = parse_template(template)
+            try:
+                self.curr_prompt = parse_template(template)
+            except (ValueError, TemplateError):
+                print("Invalid template")
+                return
         all_variables = self.curr_prompt.input_variables
         variables_layout = self.variables_layout
         variable_widget_dict = self.variable_label_widget_dict
