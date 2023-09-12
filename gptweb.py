@@ -6,26 +6,27 @@ from DrissionPage.common import Keys
 from bs4 import BeautifulSoup
 from langchain import BasePromptTemplate
 
+import chromium_utils as my_chromium_utils
+
 
 def find_and_switch_gpt_page(page):
     tab = page.find_tabs(url='https://chat.openai.com')
     page.to_tab(tab)
 
 
-def gpt_page_new_chat(page, ques):
-    page.ele('css:#__next nav > div.mb-1 > a').click.left()
+def start_new_chat(page):
+    find_and_switch_gpt_page(page)
+    page.ele('tag:a@text()=New chat').click()
+
+
+def ask_as_new_chat(page, ques):
+    start_new_chat(page)
     textarea = page.ele('#prompt-textarea')
     textarea.input(ques, clear=True)
     textarea.input(Keys.ENTER)
 
 
-def delete_gpt_latest_chat(page):
-    time.sleep(1)
-    page.ele('css:#__next nav span:nth-child(1) button:nth-child(2)').click.left()
-    page.ele('css:body div div button.btn.relative.btn-danger').click.left()
-
-
-def get_gpt_code_answer(page):
+def get_gpt_code_answer(page: ChromiumPage):
     code_ele = page.ele('css:#__next main div.text-token-text-primary code')
     while code_ele.pseudo.after != 'none':
         time.sleep(0.1)
@@ -33,15 +34,25 @@ def get_gpt_code_answer(page):
     return code_text
 
 
-def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, delete_chat=True,
-                      **kwargs: Any):
+def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, **kwargs: Any):
     find_and_switch_gpt_page(page)
-    gpt_page_new_chat(page, prompt.format(**kwargs))
+    ask_as_new_chat(page, prompt.format(**kwargs))
     code_ele = page.ele('css:#__next main div.text-token-text-primary code')
     while code_ele.pseudo.after != 'none':
         time.sleep(0.1)
     text = BeautifulSoup(code_ele.html, 'html.parser').get_text()
     code_text = text
-    if delete_chat:
-        delete_gpt_latest_chat(page)
     return code_text
+
+
+def clear_chat_history(page: ChromiumPage):
+    find_and_switch_gpt_page(page)
+    chat_list = my_chromium_utils.wait_elements(
+        lambda: page.ele('tag:h2@text()=Chat history').next('tag:nav').eles('tag:li'), 5)
+    if not chat_list:
+        raise Exception('No chat')
+    for chat in chat_list:
+        chat.ele('tag:a').click()
+        chat_buttons = my_chromium_utils.wait_elements(lambda: chat.eles('tag:button'))
+        chat_buttons[1].click()
+        page.ele('tag:button@text()=Delete').click()

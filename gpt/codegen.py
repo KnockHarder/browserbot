@@ -8,8 +8,9 @@ from jinja2 import TemplateError
 from langchain import BasePromptTemplate
 from langchain.prompts import load_prompt
 
-from gpt.prompt import TemplateFileComboBox, parse_template
-from gptweb import gen_code_question
+import gpt.prompt as my_prompt
+import gptweb
+from gpt.prompt import TemplateFileComboBox
 
 
 def clear_layout(layout: QLayout):
@@ -102,7 +103,7 @@ class CodeGeneratePage(QWidget):
         template = self.template_editor.toPlainText()
         if not self.curr_prompt or self.curr_prompt.template != template:
             try:
-                self.curr_prompt = parse_template(template)
+                self.curr_prompt = my_prompt.parse_template(template)
             except (ValueError, TemplateError):
                 print("Invalid template")
                 return
@@ -136,5 +137,5 @@ class CodeGeneratePage(QWidget):
             content = widget.text() if isinstance(widget, QLineEdit) \
                 else widget.toPlainText()
             param_map[variable] = content
-        answer = gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
+        answer = gptweb.gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
         self.answer_editor.setText(answer)

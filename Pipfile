@@ -9,6 +9,7 @@ langchain = "*"
 jinja2 = "*"
 beautifulsoup4 = "*"
 pyside6 = "*"
+py2app = "*"
 
 [dev-packages]
 
