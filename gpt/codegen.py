@@ -1,4 +1,5 @@
 import subprocess
+from typing import Optional
 
 from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot
@@ -36,8 +37,8 @@ class CodeGeneratePage(QWidget):
     variables_layout: QGridLayout
     variable_label_widget_dict: dict[str, (QLabel, QWidget)] = dict()
 
-    def __init__(self, browser_agent: ChromiumPage, templates_path):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], browser_agent: ChromiumPage, templates_path):
+        super().__init__(parent)
         self.chromium_page = browser_agent
 
         main_layout = QVBoxLayout()
@@ -73,7 +74,7 @@ class CodeGeneratePage(QWidget):
         return layout
 
     def operator_layout(self, templates_path: str):
-        search_box = TemplateFileComboBox(templates_path)
+        search_box = TemplateFileComboBox(self, templates_path)
         search_box.template_selected.connect(self.template_switch)
         search_box.setCurrentIndex(0)
         search_box.emit_item_selected(0)

@@ -3,9 +3,10 @@ import json
 import os.path
 import sys
 import time
+from typing import Optional
 
 from DrissionPage import ChromiumPage
-from PySide6.QtCore import Slot, Signal, QTimer
+from PySide6.QtCore import Slot, Signal, QTimer, QObject
 from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout, \
     QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
 
@@ -29,8 +30,8 @@ class UrlMangerWidget(QWidget):
     data_dir: str
     tab_widget: QTabWidget
 
-    def __init__(self, browser_agent: ChromiumPage, data_dir):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], browser_agent: ChromiumPage, data_dir):
+        super().__init__(parent)
         self.is_saving = False
         self.chromium_agent = browser_agent
         self.data_dir = data_dir
@@ -87,10 +88,11 @@ class UrlMangerWidget(QWidget):
             self.add_tab(tab['tabName'], tab['urls'])
 
     def add_tab(self, tab_name, url_datas: list):
-        tab_page = TabPage(url_datas)
+        tab_widget = self.tab_widget
+        tab_page = TabPage(tab_widget, url_datas)
         tab_page.archive_signal.connect(self.archive_tab)
         tab_page.table.go_url_signal.connect(self.go_url)
-        self.tab_widget.addTab(tab_page, tab_name)
+        tab_widget.addTab(tab_page, tab_name)
 
     @Slot()
     def archive_tab(self):
@@ -159,9 +161,9 @@ class UrlMangerWidget(QWidget):
 class TabPage(QWidget):
     archive_signal = Signal()
 
-    def __init__(self, url_datas: list[dict]):
-        super().__init__()
-        self.table = UrlTable(url_datas)
+    def __init__(self, parent: Optional[QWidget], url_datas: list[dict]):
+        super().__init__(parent)
+        self.table = UrlTable(self, url_datas)
 
         layout = QVBoxLayout()
         layout.addLayout(self.init_buttons())
@@ -185,8 +187,8 @@ class TabPage(QWidget):
 class UrlTable(QTableWidget):
     go_url_signal = Signal(str)
 
-    def __init__(self, url_datas: list[dict]):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], url_datas: list[dict]):
+        super().__init__(parent)
 
         self.setColumnCount(3)
         self.setHorizontalHeaderLabels(['名称', '链接', '操作'])
@@ -289,7 +291,7 @@ class UrlTable(QTableWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    widget = UrlMangerWidget(ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
+    widget = UrlMangerWidget(None, ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
     widget.setGeometry(100, 100, 850, 700)
     screen_size = app.primaryScreen().size()
     widget.move(350, 1200)

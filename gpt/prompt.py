@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Optional
 
 from PySide6.QtCore import Slot, Signal, QSortFilterProxyModel, Qt
 from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QPushButton, QMessageBox, QComboBox, \
@@ -13,8 +14,8 @@ class PromptManagementPage(QWidget):
     curr_prompt: BasePromptTemplate
     text_edit: QTextEdit
 
-    def __init__(self, templates_path):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], templates_path):
+        super().__init__(parent)
         layout = QHBoxLayout()
         layout.addLayout(self.template_edit_layout())
         layout.addLayout(self.operator_box_layout(templates_path))
@@ -30,7 +31,7 @@ class PromptManagementPage(QWidget):
     def operator_box_layout(self, templates_path: str):
         layout = QVBoxLayout()
 
-        search_box = TemplateFileComboBox(templates_path)
+        search_box = TemplateFileComboBox(self, templates_path)
         search_box.template_selected.connect(self.template_switch)
         search_box.setCurrentIndex(0)
         search_box.emit_item_selected(0)
@@ -84,8 +85,8 @@ def parse_template(template) -> PromptTemplate:
 class TemplateFileComboBox(QComboBox):
     template_selected = Signal(str)
 
-    def __init__(self, dir_path):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], dir_path):
+        super().__init__(parent)
         self.dir_path = dir_path
         all_templates = os.listdir(self.dir_path)
         self.addItems(all_templates)

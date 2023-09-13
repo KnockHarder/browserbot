@@ -1,5 +1,6 @@
 import os.path
 import sys
+from typing import Optional
 
 from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot
@@ -11,8 +12,8 @@ from gpt.prompt import PromptManagementPage
 
 
 class GptHelperWidget(QWidget):
-    def __init__(self, browser_agent, templates_path):
-        super().__init__()
+    def __init__(self, parent: Optional[QWidget], browser_agent, templates_path):
+        super().__init__(parent)
         self.browser_agent = browser_agent
         self.init_ui(templates_path)
 
@@ -25,8 +26,8 @@ class GptHelperWidget(QWidget):
     def init_main_side_bar(self, templates_path):
         layout = QVBoxLayout()
         sidebar = QTabWidget(self)
-        sidebar.addTab(CodeGeneratePage(self.browser_agent, templates_path), '代码生成')
-        sidebar.addTab(PromptManagementPage(templates_path), '模板管理')
+        sidebar.addTab(CodeGeneratePage(self, self.browser_agent, templates_path), '代码生成')
+        sidebar.addTab(PromptManagementPage(self, templates_path), '模板管理')
         layout.addWidget(sidebar)
         return layout
 
