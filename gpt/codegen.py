@@ -9,7 +9,7 @@ from langchain import BasePromptTemplate
 from langchain.prompts import load_prompt
 
 import gpt.prompt as my_prompt
-import gptweb
+from gpt import gpt_util
 from gpt.prompt import TemplateFileComboBox
 
 
@@ -36,16 +36,16 @@ class CodeGeneratePage(QWidget):
     variables_layout: QGridLayout
     variable_label_widget_dict: dict[str, (QLabel, QWidget)] = dict()
 
-    def __init__(self):
+    def __init__(self, browser_agent: ChromiumPage, templates_path):
         super().__init__()
-        self.chromium_page = ChromiumPage()
+        self.chromium_page = browser_agent
 
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
         main_layout.addLayout(self.question_area())
         layout = QHBoxLayout()
         layout.addLayout(self.answer_layout())
-        layout.addLayout(self.operator_layout())
+        layout.addLayout(self.operator_layout(templates_path))
         main_layout.addLayout(layout)
 
     def question_area(self) -> QLayout:
@@ -72,8 +72,8 @@ class CodeGeneratePage(QWidget):
         layout.addWidget(self.answer_editor)
         return layout
 
-    def operator_layout(self):
-        search_box = TemplateFileComboBox()
+    def operator_layout(self, templates_path: str):
+        search_box = TemplateFileComboBox(templates_path)
         search_box.template_selected.connect(self.template_switch)
         search_box.setCurrentIndex(0)
         search_box.emit_item_selected(0)
@@ -137,5 +137,5 @@ class CodeGeneratePage(QWidget):
             content = widget.text() if isinstance(widget, QLineEdit) \
                 else widget.toPlainText()
             param_map[variable] = content
-        answer = gptweb.gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
+        answer = gpt_util.gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
         self.answer_editor.setText(answer)

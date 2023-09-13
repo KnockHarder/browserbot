@@ -13,11 +13,11 @@ class PromptManagementPage(QWidget):
     curr_prompt: BasePromptTemplate
     text_edit: QTextEdit
 
-    def __init__(self):
+    def __init__(self, templates_path):
         super().__init__()
         layout = QHBoxLayout()
         layout.addLayout(self.template_edit_layout())
-        layout.addLayout(self.operator_box_layout())
+        layout.addLayout(self.operator_box_layout(templates_path))
         self.setLayout(layout)
 
     def template_edit_layout(self):
@@ -27,10 +27,10 @@ class PromptManagementPage(QWidget):
         layout.addWidget(self.text_edit)
         return layout
 
-    def operator_box_layout(self):
+    def operator_box_layout(self, templates_path: str):
         layout = QVBoxLayout()
 
-        search_box = TemplateFileComboBox()
+        search_box = TemplateFileComboBox(templates_path)
         search_box.template_selected.connect(self.template_switch)
         search_box.setCurrentIndex(0)
         search_box.emit_item_selected(0)
@@ -82,12 +82,12 @@ def parse_template(template) -> PromptTemplate:
 
 
 class TemplateFileComboBox(QComboBox):
-    base_dir = './templates/'
     template_selected = Signal(str)
 
-    def __init__(self):
+    def __init__(self, dir_path):
         super().__init__()
-        all_templates = os.listdir(self.base_dir)
+        self.dir_path = dir_path
+        all_templates = os.listdir(self.dir_path)
         self.addItems(all_templates)
 
         self.setEditable(True)
@@ -117,4 +117,4 @@ class TemplateFileComboBox(QComboBox):
     @Slot(int)
     def emit_item_selected(self, index: int):
         selected_item = self.itemText(index)
-        self.template_selected.emit(self.base_dir + selected_item)
+        self.template_selected.emit(os.path.join(self.dir_path, selected_item))
