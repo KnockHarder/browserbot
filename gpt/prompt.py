@@ -4,7 +4,7 @@ import sys
 from typing import Optional
 
 from PySide6.QtCore import Slot, Signal, QSortFilterProxyModel, Qt
-from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QPushButton, QMessageBox, QComboBox, \
+from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QMessageBox, QComboBox, \
     QCompleter, QInputDialog, QApplication
 from langchain import PromptTemplate
 from langchain.prompts import load_prompt
@@ -102,6 +102,7 @@ class PromptManagementPage(QWidget):
         layout.addWidget(self.templates_box)
 
         for widget in [
+            my_qt.simple_button('刷新', self.templates_box.refresh),
             my_qt.simple_button('另存为', self.save_as_new),
             my_qt.simple_button('保存', self.save_template),
             my_qt.simple_button('重命名', self.rename_template_file)
@@ -174,10 +175,10 @@ class PromptManagementPage(QWidget):
 
 
 def parse_template(template) -> PromptTemplate:
-    variables = re.findall(r'(?<!\{)\{([a-zA-Z_]+)}', template)
+    variables = list(dict.fromkeys(re.findall(r'(?<!\{)\{([a-zA-Z_]+)}', template)))
     template_format = 'f-string'
     if not variables:
-        variables = re.findall(r'\{\{([a-zA-Z_]+)}}', template)
+        variables = list(dict.fromkeys(re.findall(r'\{\{([a-zA-Z_]+)}}', template)))
         template_format = 'jinja2'
     return PromptTemplate(template=template, input_variables=variables, template_format=template_format)
 
