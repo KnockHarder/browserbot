@@ -56,3 +56,4 @@ def clear_chat_history(page: ChromiumPage):
         chat_buttons = my_chromium_utils.wait_elements(lambda: chat.eles('tag:button'))
         chat_buttons[1].click()
         page.ele('tag:button@text()=Delete').click()
+        time.sleep(1)

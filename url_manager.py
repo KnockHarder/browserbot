@@ -6,7 +6,7 @@ import time
 from typing import Optional
 
 from DrissionPage import ChromiumPage
-from PySide6.QtCore import Slot, Signal, QTimer, QObject
+from PySide6.QtCore import Slot, Signal, QTimer
 from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout, \
     QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
 
@@ -74,8 +74,9 @@ class UrlMangerWidget(QWidget):
 
     @Slot()
     def create_new_tab(self):
-        tab_name = QInputDialog.getText(self, '新增页签', '页签名称')[0]
-        self.add_tab(tab_name, [])
+        tab_name, confirmed = QInputDialog.getText(self, '新增页签', '页签名称')
+        if confirmed and tab_name and tab_name.strip():
+            self.add_tab(tab_name, [])
 
     @Slot()
     def load_tabs(self):
