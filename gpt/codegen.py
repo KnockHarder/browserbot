@@ -1,10 +1,12 @@
+import os
 import subprocess
+import sys
 from typing import Optional
 
 from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, \
-    QGridLayout, QLayout, QLineEdit
+    QGridLayout, QLayout, QLineEdit, QApplication
 from jinja2 import TemplateError
 from langchain import BasePromptTemplate
 from langchain.prompts import load_prompt
@@ -12,6 +14,7 @@ from langchain.prompts import load_prompt
 import gpt.prompt as my_prompt
 from gpt import gpt_util
 from gpt.prompt import TemplateFileComboBox
+import qt_utils as my_qt
 
 
 def clear_layout(layout: QLayout):
@@ -79,14 +82,14 @@ class CodeGeneratePage(QWidget):
         search_box.setCurrentIndex(0)
         search_box.emit_item_selected(0)
 
-        submit_button = QPushButton('生成代码')
-        submit_button.clicked.connect(self.submit_question)
-        copy_button = QPushButton('复制回答')
-        copy_button.clicked.connect(self.copy_answer)
         layout = QVBoxLayout()
         layout.addWidget(search_box)
-        layout.addWidget(submit_button)
-        layout.addWidget(copy_button)
+        for widget in [
+            my_qt.simple_button('刷新模板', search_box.refresh),
+            my_qt.simple_button('生成代码', self.submit_question),
+            my_qt.simple_button('复制回答', self.copy_answer)
+        ]:
+            layout.addWidget(widget)
         return layout
 
     @Slot(str)
@@ -140,3 +143,16 @@ class CodeGeneratePage(QWidget):
             param_map[variable] = content
         answer = gpt_util.gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
         self.answer_editor.setText(answer)
+
+
+if __name__ == '__main__':
+    def main():
+        app = QApplication()
+        page = CodeGeneratePage(None, ChromiumPage(), os.path.expanduser('~/.my_py_datas/chatgpt/templates'))
+        screen_size = app.primaryScreen().size()
+        page.setGeometry(350, screen_size.height() / 2, 1000, 800)
+        page.show()
+        sys.exit(app.exec())
+
+
+    main()
