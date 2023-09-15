@@ -1,4 +1,5 @@
 import time
+from typing import Callable
 
 from DrissionPage import ChromiumPage
 
@@ -13,7 +14,7 @@ def go_url(chromium_page: ChromiumPage, url: str):
         chromium_page.to_tab(chromium_page.new_tab(url))
 
 
-def wait_elements(ele_func: callable, timeout: int = 5):
+def wait_elements(ele_func: Callable, timeout: int = 5):
     start = time.time()
     elements = ele_func()
     while not elements and time.time() - start < timeout:

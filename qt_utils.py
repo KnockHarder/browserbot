@@ -1,7 +1,9 @@
+from typing import Callable
+
 from PySide6.QtWidgets import QPushButton, QMessageBox, QWidget, QInputDialog
 
 
-def simple_button(name: str, slot: callable):
+def simple_button(name: str, slot: Callable):
     button = QPushButton(name)
     button.clicked.connect(slot)
     return button

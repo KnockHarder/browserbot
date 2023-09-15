@@ -127,7 +127,8 @@ class CodeGeneratePage(QWidget):
                 (label, widget) = variable_widget_dict.get(variable)
             else:
                 label = QLabel(variable, self)
-                widget = QTextEdit(self) if idx == len(all_variables) - 1 \
+                widget = QTextEdit(self) \
+                    if idx == len(all_variables) - 1 or 'code' in variable \
                     else QLineEdit(self)
                 variable_widget_dict[variable] = (label, widget)
             variables_layout.addWidget(label, idx, 0)
