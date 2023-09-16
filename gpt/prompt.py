@@ -71,7 +71,7 @@ class TemplateFileComboBox(QComboBox):
 
     def refresh(self):
         self.clear()
-        self.addItems(os.listdir(self.dir_path))
+        self.addItems(sorted(os.listdir(self.dir_path)))
 
 
 class PromptManagementPage(QWidget):

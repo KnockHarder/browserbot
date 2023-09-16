@@ -1,0 +1,11 @@
+{
+    "input_variables": [
+        "article_name"
+    ],
+    "output_parser": null,
+    "partial_variables": {},
+    "template": "\u6211\u5c06\u7ed9\u4f60\u4e00\u7bc7\u6807\u9898\u4e3a\u300a{article_name}\u300b\u7684\u6587\u7ae0\u7684\u5185\u5bb9\u4fe1\u606f\uff0c\u4f60\u9700\u8981\u5e2e\u6211\u5bf9\u6587\u7ae0\u7684\u5185\u5bb9\u505a\u603b\u7ed3\u3002\n\u5982\u679c\u6587\u4ef6\u8fc7\u4e8e\u5927\uff0c\u6211\u53ef\u80fd\u4f1a\u62c6\u5206\u6210\u591a\u6b21\u7ed9\u4f60\uff0c\u6587\u7ae0\u5185\u5bb9\u88ab'###part'\u6216\u8005'###end'\u4e0a\u4e0b\u5305\u56f4\u3002",
+    "template_format": "f-string",
+    "validate_template": true,
+    "_type": "prompt"
+}
