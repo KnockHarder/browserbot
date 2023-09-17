@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout
     QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
 
 import chromium_utils as my_chromium_utils
+import qt_utils as my_qt
 
 
 def create_dir_if_not_exist(data_dir):
@@ -24,6 +25,11 @@ def read_json_array_from_file(path):
     with open(path) as fp:
         all_data = json.load(fp)
     return all_data
+
+
+class TabNotFoundException(Exception):
+    def __init__(self):
+        super().__init__()
 
 
 class UrlMangerWidget(QWidget):
@@ -92,22 +98,13 @@ class UrlMangerWidget(QWidget):
         tab_widget = self.tab_widget
         tab_page = TabPage(tab_widget, url_datas)
         tab_page.archive_signal.connect(self.archive_tab)
+        tab_page.rename_signal.connect(self.rename_tab)
         tab_page.table.go_url_signal.connect(self.go_url)
         tab_widget.addTab(tab_page, tab_name)
 
     @Slot()
     def archive_tab(self):
-        table_page = self.sender()
-        tab_idx = -1
-        tab_widget = self.tab_widget
-        for idx in range(tab_widget.count()):
-            if tab_widget.widget(idx) == table_page:
-                tab_idx = idx
-                break
-        if tab_idx < 0:
-            print('Can not find need archive table')
-            return
-
+        tab_idx = self.index_tab(self.sender())
         tab_data = self.build_table_page_json(tab_idx)
         month_file = datetime.datetime.now().strftime("%Y_%m") + '.json'
         month_file = os.path.join(self.data_dir, month_file)
@@ -116,7 +113,19 @@ class UrlMangerWidget(QWidget):
         month_data.append(tab_data)
         with open(month_file, 'w') as fp:
             json.dump(month_data, fp, ensure_ascii=False, indent=2)
-        tab_widget.removeTab(tab_idx)
+        self.tab_widget.removeTab(tab_idx)
+
+    def index_tab(self, widget):
+        tab_widget = self.tab_widget
+        for idx in range(tab_widget.count()):
+            if tab_widget.widget(idx) == widget:
+                return idx
+        raise TabNotFoundException()
+
+    @Slot(str)
+    def rename_tab(self, name):
+        tab_idx = self.index_tab(self.sender())
+        self.tab_widget.setTabText(tab_idx, name)
 
     @Slot(str)
     def go_url(self, url: str):
@@ -161,6 +170,7 @@ class UrlMangerWidget(QWidget):
 
 class TabPage(QWidget):
     archive_signal = Signal()
+    rename_signal = Signal(str)
 
     def __init__(self, parent: Optional[QWidget], url_datas: list[dict]):
         super().__init__(parent)
@@ -174,15 +184,21 @@ class TabPage(QWidget):
         self.setLayout(layout)
 
     def init_buttons(self):
-        archive_button = QPushButton('归档')
-        archive_button.clicked.connect(self.emit_archive_signal)
         layout = QHBoxLayout()
-        layout.addWidget(archive_button)
+        layout.addWidget(my_qt.simple_button('重命名', self.emit_rename_signal))
+        layout.addWidget(my_qt.simple_button('归档', self.emit_archive_signal))
         return layout
 
     @Slot()
     def emit_archive_signal(self):
         self.archive_signal.emit()
+
+    @Slot()
+    def emit_rename_signal(self):
+        name, confirmed = QInputDialog.getText(self, '重命名标签页', '新名称')
+        if not confirmed:
+            return
+        self.rename_signal.emit(name)
 
 
 class UrlTable(QTableWidget):
@@ -291,10 +307,13 @@ class UrlTable(QTableWidget):
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    widget = UrlMangerWidget(None, ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
-    widget.setGeometry(100, 100, 850, 700)
-    screen_size = app.primaryScreen().size()
-    widget.move(350, 1200)
-    widget.show()
-    sys.exit(app.exec())
+    def main():
+        app = QApplication(sys.argv)
+        widget = UrlMangerWidget(None, ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
+        widget.setGeometry(100, 100, 850, 700)
+        widget.move(350, 1200)
+        widget.show()
+        sys.exit(app.exec())
+
+
+    main()
