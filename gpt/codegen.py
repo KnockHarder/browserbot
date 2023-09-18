@@ -14,7 +14,6 @@ from langchain.prompts import load_prompt
 import gpt.prompt as my_prompt
 from gpt import gpt_util
 from gpt.prompt import TemplateFileComboBox
-import qt_utils as my_qt
 
 
 def clear_layout(layout: QLayout):
@@ -84,10 +83,16 @@ class CodeGeneratePage(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(search_box)
+
+        def simple_button(name, slot):
+            button = QPushButton(name)
+            button.clicked.connect(slot)
+            return button
+
         for widget in [
-            my_qt.simple_button('刷新模板', search_box.refresh),
-            my_qt.simple_button('生成代码', self.submit_question),
-            my_qt.simple_button('复制回答', self.copy_answer)
+            simple_button('刷新模板', search_box.refresh),
+            simple_button('生成代码', self.submit_question),
+            simple_button('复制回答', self.copy_answer)
         ]:
             layout.addWidget(widget)
         return layout

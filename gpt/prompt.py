@@ -5,11 +5,9 @@ from typing import Optional
 
 from PySide6.QtCore import Slot, Signal, QSortFilterProxyModel, Qt
 from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QMessageBox, QComboBox, \
-    QCompleter, QInputDialog, QApplication
+    QCompleter, QInputDialog, QApplication, QPushButton
 from langchain import PromptTemplate
 from langchain.prompts import load_prompt
-
-import qt_utils as my_qt
 
 
 class TemplateFileComboBox(QComboBox):
@@ -101,11 +99,16 @@ class PromptManagementPage(QWidget):
         self.templates_box.activate_item(0)
         layout.addWidget(self.templates_box)
 
+        def simple_button(name, slot):
+            button = QPushButton(name)
+            button.clicked.connect(slot)
+            return button
+
         for widget in [
-            my_qt.simple_button('刷新', self.templates_box.refresh),
-            my_qt.simple_button('另存为', self.save_as_new),
-            my_qt.simple_button('保存', self.save_template),
-            my_qt.simple_button('重命名', self.rename_template_file)
+            simple_button('刷新', self.templates_box.refresh),
+            simple_button('另存为', self.save_as_new),
+            simple_button('保存', self.save_template),
+            simple_button('重命名', self.rename_template_file)
         ]:
             layout.addWidget(widget)
         return layout
@@ -144,7 +147,7 @@ class PromptManagementPage(QWidget):
             return
         item, file_path = self.templates_box.alloc_new_template_file_path(file_name)
         if not item:
-            my_qt.popup_information_box(self, f'文件已存在: {file_path}')
+            QMessageBox.critical(self, '存储失败', f'文件已存在: {file_path}')
             return
         self.save_as_new_file(file_path)
         self.templates_box.refresh()
@@ -154,11 +157,13 @@ class PromptManagementPage(QWidget):
     def rename_template_file(self):
         curr_file_path = self.current_template_file
         if not curr_file_path:
-            my_qt.popup_information_box(self, '请先选择Prompt')
+            QMessageBox.information(self, '无效', '请先选择Prompt')
             return
         prompt = load_prompt(curr_file_path)
         if prompt.template != self.text_edit.toPlainText():
-            if not my_qt.popup_confirm_box(self, '是否revert当前template？'):
+            question = QMessageBox.question(self, '确认', '是否revert当前template？', QMessageBox.StandardButton.Yes,
+                                            QMessageBox.StandardButton.No)
+            if question != QMessageBox.StandardButton.Yes:
                 return
             self.set_curr_template(curr_file_path)
         while True:
@@ -171,7 +176,7 @@ class PromptManagementPage(QWidget):
                 self.templates_box.refresh()
                 return
             else:
-                my_qt.popup_information_box(self, '文件已存在', QMessageBox.Icon.Critical)
+                QMessageBox.critical(self, '异常', '文件已存在')
 
 
 def parse_template(template) -> PromptTemplate:

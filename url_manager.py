@@ -12,7 +12,6 @@ from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout
     QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
 
 import chromium_utils as my_chromium_utils
-import qt_utils as my_qt
 
 
 def create_dir_if_not_exist(data_dir):
@@ -200,9 +199,14 @@ class TabPage(QWidget):
         self.setLayout(layout)
 
     def init_buttons(self):
+        def simple_button(name, slot):
+            button = QPushButton(name)
+            button.clicked.connect(slot)
+            return button
+
         layout = QHBoxLayout()
-        layout.addWidget(my_qt.simple_button('重命名', self.emit_rename_signal))
-        layout.addWidget(my_qt.simple_button('归档', self.emit_archive_signal))
+        layout.addWidget(simple_button('重命名', self.emit_rename_signal))
+        layout.addWidget(simple_button('归档', self.emit_archive_signal))
         return layout
 
     @Slot()
