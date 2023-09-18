@@ -7,6 +7,7 @@ from typing import Optional
 
 from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot, Signal, QTimer
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout, \
     QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
 
@@ -55,6 +56,7 @@ class UrlMangerWidget(QWidget):
     def init_from_data_file(self):
         content_layout = QVBoxLayout()
         self.tab_widget = QTabWidget()
+        self.bind_tab_keys()
         content_layout.addWidget(self.tab_widget)
 
         main_layout = QVBoxLayout()
@@ -64,6 +66,20 @@ class UrlMangerWidget(QWidget):
 
         for tab_data in read_json_array_from_file(self.data_file_path()):
             self.add_tab(tab_data.get('tabName'), tab_data.get('urls'))
+
+    def bind_tab_keys(self):
+        tab_widget = self.tab_widget
+
+        def switch_tab(tab_idx):
+            if tab_idx >= tab_widget.count():
+                return
+            tab_widget.setCurrentIndex(tab_idx)
+
+        for idx in range(10):
+            action = QAction(tab_widget)
+            action.setShortcut(f'Alt+{(idx + 1) % 10}')
+            action.triggered.connect(lambda *args, _idx=idx: switch_tab(_idx))
+            tab_widget.addAction(action)
 
     def add_tool_buttons(self) -> QLayout:
         layout = QHBoxLayout()
