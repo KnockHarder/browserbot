@@ -9,7 +9,7 @@ from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot, Signal, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QTabWidget, QTableWidget, QPushButton, QHBoxLayout, \
-    QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog
+    QLineEdit, QWidget, QApplication, QVBoxLayout, QInputDialog, QLayout, QFileDialog, QDialog, QCheckBox
 
 import chromium_utils as my_chromium_utils
 
@@ -106,8 +106,26 @@ class UrlMangerWidget(QWidget):
         if not dialog.exec():
             return
         tabs = read_json_array_from_file(dialog.selectedFiles()[0])
+        if not tabs:
+            return
+        self.load_selected_tabs(tabs)
+
+    def load_selected_tabs(self, tabs):
+        dialog = QDialog()
+        dialog.setLayout(QVBoxLayout())
+        options = []
         for tab in tabs:
-            self.add_tab(tab['tabName'], tab['urls'])
+            option = QCheckBox(tab['tabName'])
+            options.append(option)
+            dialog.layout().addWidget(option)
+        confirm_btn = QPushButton('确认')
+        confirm_btn.clicked.connect(dialog.accept)
+        dialog.layout().addWidget(confirm_btn)
+        dialog.exec()
+        for idx, option in enumerate(options):
+            if option.isChecked():
+                tab: dict = tabs[idx]
+                self.add_tab(tab['tabName'], tab['urls'])
 
     def add_tab(self, tab_name, url_datas: list):
         tab_widget = self.tab_widget
