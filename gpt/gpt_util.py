@@ -16,7 +16,7 @@ def _find_and_switch_gpt_page(page):
 
 def start_new_chat(page):
     _find_and_switch_gpt_page(page)
-    page.ele('tag:a@text()=New chat').click()
+    page.ele('tag:a@@text()=New Chat').click()
 
 
 def _ask_as_new_chat(page, ques):

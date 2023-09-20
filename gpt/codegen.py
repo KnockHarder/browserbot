@@ -5,8 +5,8 @@ from typing import Optional
 
 from DrissionPage import ChromiumPage
 from PySide6.QtCore import Slot
-from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, \
-    QGridLayout, QLayout, QLineEdit, QApplication
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, \
+    QGridLayout, QLayout, QLineEdit, QApplication, QPlainTextEdit
 from jinja2 import TemplateError
 from langchain import BasePromptTemplate
 from langchain.prompts import load_prompt
@@ -34,8 +34,8 @@ def remove_grid_layout_row(layout: QGridLayout, row: int, remove_widget: bool):
 
 class CodeGeneratePage(QWidget):
     curr_prompt: BasePromptTemplate
-    template_editor: QTextEdit
-    answer_editor: QTextEdit
+    template_editor: QPlainTextEdit
+    answer_editor: QPlainTextEdit
     variables_layout: QGridLayout
     variable_label_widget_dict: dict[str, (QLabel, QWidget)] = dict()
 
@@ -53,7 +53,7 @@ class CodeGeneratePage(QWidget):
 
     def question_area(self) -> QLayout:
         layout1 = QVBoxLayout()
-        self.template_editor = QTextEdit(self)
+        self.template_editor = QPlainTextEdit(self)
         self.template_editor.textChanged.connect(self.update_variables_layout)
         layout1.addWidget(QLabel('模板内容', self))
         layout1.addWidget(self.template_editor)
@@ -70,8 +70,8 @@ class CodeGeneratePage(QWidget):
 
     def answer_layout(self):
         layout = QVBoxLayout()
-        layout.addWidget(QLabel('回答代码'))
-        self.answer_editor = QTextEdit(self)
+        layout.addWidget(QLabel('回答代码', self))
+        self.answer_editor = QPlainTextEdit(self)
         layout.addWidget(self.answer_editor)
         return layout
 
@@ -100,7 +100,7 @@ class CodeGeneratePage(QWidget):
     @Slot(str)
     def template_switch(self, template_file: str):
         self.curr_prompt = load_prompt(template_file)
-        self.template_editor.setText(self.curr_prompt.template)
+        self.template_editor.setPlainText(self.curr_prompt.template)
 
     @Slot()
     def copy_answer(self):
@@ -132,7 +132,7 @@ class CodeGeneratePage(QWidget):
                 (label, widget) = variable_widget_dict.get(variable)
             else:
                 label = QLabel(variable, self)
-                widget = QTextEdit(self) \
+                widget = QPlainTextEdit(self) \
                     if idx == len(all_variables) - 1 or 'code' in variable \
                     else QLineEdit(self)
                 variable_widget_dict[variable] = (label, widget)
@@ -148,7 +148,7 @@ class CodeGeneratePage(QWidget):
                 else widget.toPlainText()
             param_map[variable] = content
         answer = gpt_util.gen_code_question(self.chromium_page, self.curr_prompt, **param_map)
-        self.answer_editor.setText(answer)
+        self.answer_editor.setPlainText(answer)
 
 
 if __name__ == '__main__':

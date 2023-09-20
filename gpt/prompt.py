@@ -4,8 +4,8 @@ import sys
 from typing import Optional
 
 from PySide6.QtCore import Slot, Signal, QSortFilterProxyModel, Qt
-from PySide6.QtWidgets import QWidget, QTextEdit, QHBoxLayout, QVBoxLayout, QMessageBox, QComboBox, \
-    QCompleter, QInputDialog, QApplication, QPushButton
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QMessageBox, QComboBox, \
+    QCompleter, QInputDialog, QApplication, QPushButton, QPlainTextEdit
 from langchain import PromptTemplate
 from langchain.prompts import load_prompt
 
@@ -74,7 +74,7 @@ class TemplateFileComboBox(QComboBox):
 
 class PromptManagementPage(QWidget):
     current_template_file: str
-    text_edit: QTextEdit
+    text_edit: QPlainTextEdit
     templates_box: TemplateFileComboBox
 
     def __init__(self, parent: Optional[QWidget], templates_path):
@@ -87,7 +87,7 @@ class PromptManagementPage(QWidget):
     def template_edit_layout(self):
         # 左侧内容区
         layout = QVBoxLayout()
-        self.text_edit = QTextEdit()
+        self.text_edit = QPlainTextEdit()
         layout.addWidget(self.text_edit)
         return layout
 
@@ -116,7 +116,7 @@ class PromptManagementPage(QWidget):
     @Slot(str)
     def set_curr_template(self, template_file_path: str):
         self.current_template_file = template_file_path
-        self.text_edit.setText(load_prompt(self.current_template_file).template)
+        self.text_edit.setPlainText(load_prompt(self.current_template_file).template)
 
     @Slot()
     def save_template(self):
