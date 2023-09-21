@@ -36,7 +36,7 @@ class UrlMangerWidget(QWidget):
     data_dir: str
     tab_widget: QTabWidget
 
-    def __init__(self, parent: Optional[QWidget], browser_agent: ChromiumPage, data_dir):
+    def __init__(self, browser_agent: ChromiumPage, data_dir, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.is_saving = False
         self.chromium_agent = browser_agent
@@ -347,7 +347,7 @@ class UrlTable(QTableWidget):
 if __name__ == '__main__':
     def main():
         app = QApplication(sys.argv)
-        widget = UrlMangerWidget(None, ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
+        widget = UrlMangerWidget(ChromiumPage(), os.path.expanduser('~/.my_py_datas/url_manager'))
         widget.setGeometry(100, 100, 850, 700)
         widget.move(350, 1200)
         widget.show()

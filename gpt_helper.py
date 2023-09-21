@@ -12,7 +12,7 @@ from gpt.prompt import PromptManagementPage
 
 
 class GptHelperWidget(QWidget):
-    def __init__(self, parent: Optional[QWidget], browser_agent, templates_path):
+    def __init__(self, browser_agent, templates_path, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.browser_agent = browser_agent
         self.init_ui(templates_path)

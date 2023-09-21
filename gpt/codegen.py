@@ -72,6 +72,7 @@ class CodeGeneratePage(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(QLabel('回答代码', self))
         self.answer_editor = QPlainTextEdit(self)
+        self.answer_editor.setReadOnly(True)
         layout.addWidget(self.answer_editor)
         return layout
 
