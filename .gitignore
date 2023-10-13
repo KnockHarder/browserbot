@@ -1,4 +1,6 @@
 /.idea/
 *.lock
-/.DS_Store
 /dist/
+*_uic.py
+.DS_Store
+*_rc.py

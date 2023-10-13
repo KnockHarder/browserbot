@@ -34,7 +34,7 @@ def gen_code_question(page: ChromiumPage, prompt: BasePromptTemplate, **kwargs: 
     _find_and_switch_gpt_page(page)
     _ask_as_new_chat(page, prompt.format(**kwargs))
     code_ele = page.ele('css:#__next main div.text-token-text-primary code')
-    while code_ele.pseudo.after != 'none':
+    while not code_ele or code_ele.pseudo.after != 'none':
         time.sleep(0.1)
     text = BeautifulSoup(code_ele.html, 'html.parser').get_text()
     code_text = text
