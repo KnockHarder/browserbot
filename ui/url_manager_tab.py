@@ -93,10 +93,10 @@ class UrlManagerTabFrame(QFrame):
 
     def archive_tab(self):
         tab_widget = self.ui.tabWidget
-        table_frame = self.sender()
+        table_frame: UrlTableFrame = self.sender()
         tab_idx = tab_widget.indexOf(table_frame)
         tab_name = tab_widget.tabText(tab_idx)
-        urls = table_frame.dump_urls_as_json()
+        urls = table_frame.get_url_datas()
         month_file = month_data_file_path()
         file_tabs = read_tab_data_from_file(month_file)
         file_tabs = list(filter(lambda x: x['tabName'] != tab_name, file_tabs))
@@ -131,7 +131,10 @@ class UrlManagerTabFrame(QFrame):
             all_data = list()
             for idx in range(tab_widget.count()):
                 table_frame: UrlTableFrame = tab_widget.widget(idx)
-                all_data.append(table_frame.get_url_datas())
+                all_data.append({
+                    "tabName": tab_widget.tabText(idx),
+                    "urls": table_frame.get_url_datas()
+                })
             with open(main_data_file_path(), 'w') as fp:
                 json.dump(all_data, fp, ensure_ascii=False, indent=2)
         finally:
