@@ -164,46 +164,42 @@ class UrlTableFrame(QFrame):
         table_widget.model().rowsInserted.connect(
             lambda _, b, e: [self.init_row(i) for i in range(b, e + 1)])
         table_widget.cellDoubleClicked.connect(self.go_cell_url)
-        table_widget.itemChanged.connect(self.update_edit_data)
+        table_widget.cellChanged.connect(self.update_cell_data)
 
         self.browser = get_browser()
 
     def init_row(self, row):
         table_widget = self.ui.tableWidget
-        header_item = table_widget.verticalHeaderItem(row)
-        if not header_item:
-            table_widget.setVerticalHeaderItem(row, QTableWidgetItem())
         first_cell_item = QTableWidgetItem('无')
         table_widget.setItem(row, 0, first_cell_item)
         table_widget.setItem(row, 1, QTableWidgetItem('<p style="color: LightGray">Markdown文本</p>'))
         widget = TableRowOperatorWidget(table_widget)
         widget.ui.deleteButton.clicked.connect(lambda: self.delete_row(table_widget.row(first_cell_item)))
         table_widget.setCellWidget(row, 2, widget)
+        header_item = table_widget.verticalHeaderItem(row)
+        if not header_item:
+            header_item = QTableWidgetItem()
+            table_widget.setVerticalHeaderItem(row, header_item)
+        self.set_url_data(header_item, dict())
 
     def go_cell_url(self, row, col):
         if col != 1:
             return
-        table_widget = self.ui.tableWidget
         try:
-            url = table_widget.verticalHeaderItem(row).data(self.URL_DATA_ROLE)['url']
+            url = self.get_row_bind_data(row)['url']
             if url:
                 go_url(self.browser, url)
         except TypeError:
             pass
 
-    def update_edit_data(self, item: QTableWidgetItem):
-        if not item.isSelected():
+    def update_cell_data(self, row: int, column: int):
+        data = self.get_row_bind_data(row)
+        if data is None:
             return
-        table_widget = self.ui.tableWidget
-        header_item = table_widget.verticalHeaderItem(table_widget.row(item))
-        data = header_item.data(self.URL_DATA_ROLE)
-        if not data:
-            data = dict()
-        column = table_widget.column(item)
-        text = item.text()
+        text = self.ui.tableWidget.item(row, column).text()
         if column == 0:
             data['category'] = text
-            header_item.setData(self.URL_DATA_ROLE, data)
+            self.set_row_bind_data(row, data)
         elif column == 1:
             try:
                 parts = re.findall(r'\[(.*?)]\((.*?)\)', text)[0]
@@ -215,7 +211,17 @@ class UrlTableFrame(QFrame):
                 name, url = text, None
             data['name'] = name
             data['url'] = url
-            header_item.setData(self.URL_DATA_ROLE, data)
+            self.set_row_bind_data(row, data)
+
+    def get_row_bind_data(self, row):
+        return self.ui.tableWidget.verticalHeaderItem(row).data(self.URL_DATA_ROLE)
+
+    def set_url_data(self, item: QTableWidgetItem, data: Optional[dict]):
+        item.setData(self.URL_DATA_ROLE, data)
+
+    def set_row_bind_data(self, row: int, data: dict):
+        item = self.ui.tableWidget.verticalHeaderItem(row)
+        self.set_url_data(item, data)
 
     def update_table(self, urls: list):
         table_widget = self.ui.tableWidget
@@ -246,7 +252,8 @@ class UrlTableFrame(QFrame):
         if not item:
             item = QTableWidgetItem(str(row + 1))
             table_widget.setVerticalHeaderItem(row, item)
-        item.setData(self.URL_DATA_ROLE, data)
+        # 屏蔽更新触发逻辑
+        self.set_url_data(item, None)
 
         def get_category():
             category = data.get('category')
@@ -262,11 +269,16 @@ class UrlTableFrame(QFrame):
 
         table_widget.item(row, 0).setText(get_category())
         table_widget.item(row, 1).setText(markdown_url())
+        self.set_url_data(item, data)
 
     def get_url_datas(self) -> list:
         table_widget = self.ui.tableWidget
-        datas = [table_widget.verticalHeaderItem(i).data(self.URL_DATA_ROLE)
-                 for i in range(table_widget.rowCount())]
+
+        def get_visual_row_data(idx: int):
+            logical_index = table_widget.verticalHeader().logicalIndex(idx)
+            return self.get_row_bind_data(logical_index)
+
+        datas = [get_visual_row_data(i) for i in range(table_widget.rowCount())]
         return [x for x in datas if x]
 
 
