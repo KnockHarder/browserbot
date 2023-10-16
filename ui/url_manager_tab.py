@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Slot, Signal, Qt, QTimer
+from PySide6.QtCore import Slot, Qt, QTimer
 from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QApplication, \
     QTableWidgetItem
 
@@ -40,6 +40,9 @@ class UrlManagerTabFrame(QFrame):
         from ui.url_manager_tab_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
+        tab_widget = self.ui.tabWidget
+        tab_widget.tabBarDoubleClicked.connect(self.rename_tab)
+        tab_widget.tabCloseRequested.connect(self.archive_tab)
 
         self.load_main_data()
         timer = QTimer(self)
@@ -58,16 +61,20 @@ class UrlManagerTabFrame(QFrame):
     def add_tab(self):
         dialog = QInputDialog(self)
         dialog.setLabelText('新的TAB页名称')
-        dialog.textValueSelected.connect(self.create_tab_from_data)
+
+        def create_new_tab(name: str):
+            index = self.create_tab_from_data(name)
+            self.ui.tabWidget.setCurrentIndex(index)
+
+        dialog.textValueSelected.connect(create_new_tab)
         dialog.open()
 
     def create_tab_from_data(self, tab_name: str, urls: list = None):
         tab_widget = self.ui.tabWidget
         frame = UrlTableFrame(tab_widget)
         frame.update_table(urls)
-        frame.archiveTabClicked.connect(self.archive_tab)
-        frame.renameTabClicked.connect(self.rename_tab)
         tab_widget.addTab(frame, tab_name)
+        return tab_widget.count() - 1
 
     @Slot()
     def add_tab_from_file(self):
@@ -91,32 +98,30 @@ class UrlManagerTabFrame(QFrame):
         dialog.fileSelected.connect(load_tab_with_selection)
         dialog.open()
 
-    def archive_tab(self):
+    def archive_tab(self, index: int):
         tab_widget = self.ui.tabWidget
-        table_frame: UrlTableFrame = self.sender()
-        tab_idx = tab_widget.indexOf(table_frame)
-        tab_name = tab_widget.tabText(tab_idx)
-        urls = table_frame.get_url_datas()
+
+        tab_name = tab_widget.tabText(index)
+        table_frame: UrlTableFrame = tab_widget.widget(index)
         month_file = month_data_file_path()
         file_tabs = read_tab_data_from_file(month_file)
         file_tabs = list(filter(lambda x: x['tabName'] != tab_name, file_tabs))
         file_tabs.append({
             "tabName": tab_name,
-            "urls": urls
+            "urls": table_frame.get_url_datas()
         })
         with open(month_file, 'w') as fp:
             json.dump(file_tabs, fp, ensure_ascii=False, indent=2)
-        tab_widget.removeTab(tab_idx)
+        tab_widget.removeTab(index)
 
-    def rename_tab(self):
+    def rename_tab(self, index: int):
         tab_widget = self.ui.tabWidget
-        tab_idx = tab_widget.indexOf(self.sender())
 
         dialog = QInputDialog(self)
         dialog.setLabelText('新的标签名')
 
         def rename_tab_to(name: str):
-            tab_widget.setTabText(tab_idx, name)
+            tab_widget.setTabText(index, name)
 
         dialog.textValueSelected.connect(rename_tab_to)
         dialog.show()
@@ -143,9 +148,6 @@ class UrlManagerTabFrame(QFrame):
 
 class UrlTableFrame(QFrame):
     URL_DATA_ROLE = Qt.ItemDataRole.UserRole + 1
-
-    archiveTabClicked = Signal()
-    renameTabClicked = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -256,14 +258,6 @@ class UrlTableFrame(QFrame):
 
         table_widget.item(row, 0).setText(get_category())
         table_widget.item(row, 1).setText(markdown_url())
-
-    @Slot()
-    def archive_tab(self):
-        self.archiveTabClicked.emit()
-
-    @Slot()
-    def rename_tab(self):
-        self.renameTabClicked.emit()
 
     def get_url_datas(self) -> list:
         table_widget = self.ui.tableWidget

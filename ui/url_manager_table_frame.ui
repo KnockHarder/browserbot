@@ -15,31 +15,6 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QPushButton" name="pushButton">
-       <property name="text">
-        <string>重命名</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="pushButton_2">
-       <property name="styleSheet">
-        <string notr="true">QPushButton {
-	color: white;
-	background-color: rgb(205, 125, 124);
-    border-radius: 6px;
-}</string>
-       </property>
-       <property name="text">
-        <string>归档</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
     <widget class="AccessibleTableWidget" name="tableWidget">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -79,9 +54,6 @@
      <property name="horizontalScrollMode">
       <enum>QAbstractItemView::ScrollPerPixel</enum>
      </property>
-     <property name="sortingEnabled">
-      <bool>true</bool>
-     </property>
      <property name="columnCount">
       <number>3</number>
      </property>
@@ -112,40 +84,7 @@
   </customwidget>
  </customwidgets>
  <resources/>
- <connections>
-  <connection>
-   <sender>pushButton</sender>
-   <signal>clicked()</signal>
-   <receiver>Frame</receiver>
-   <slot>rename_tab()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>66</x>
-     <y>29</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>10</x>
-     <y>50</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>pushButton_2</sender>
-   <signal>clicked()</signal>
-   <receiver>Frame</receiver>
-   <slot>archive_tab()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>306</x>
-     <y>27</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>280</x>
-     <y>43</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
  <slots>
   <slot>rename_tab()</slot>
   <slot>archive_tab()</slot>
