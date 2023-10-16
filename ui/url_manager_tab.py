@@ -89,8 +89,9 @@ class UrlManagerTabFrame(QFrame):
             dialog1.setOption(QInputDialog.InputDialogOption.UseListViewForComboBoxItems)
 
             def load_tab_selected(tab_name: str):
-                data = next(filter(lambda data: data['tabName'] == tab_name, tabs), None)
-                self.create_tab_from_data(tab_name, data['urls'])
+                data = next(filter(lambda x: x['tabName'] == tab_name, tabs), None)
+                idx = self.create_tab_from_data(tab_name, data['urls'])
+                self.ui.tabWidget.setCurrentIndex(idx)
 
             dialog1.textValueSelected.connect(load_tab_selected)
             dialog1.open()
@@ -204,10 +205,13 @@ class UrlTableFrame(QFrame):
             data['category'] = text
             header_item.setData(self.URL_DATA_ROLE, data)
         elif column == 1:
-            parts = re.findall(r'\[(.*?)]\((.*?)\)', text)[0]
-            if parts and len(parts) == 2:
-                name, url = parts
-            else:
+            try:
+                parts = re.findall(r'\[(.*?)]\((.*?)\)', text)[0]
+                if parts and len(parts) == 2:
+                    name, url = parts
+                else:
+                    name, url = text, None
+            except IndexError:
                 name, url = text, None
             data['name'] = name
             data['url'] = url

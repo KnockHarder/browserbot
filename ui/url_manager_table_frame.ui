@@ -34,7 +34,7 @@
 }</string>
      </property>
      <property name="editTriggers">
-      <set>QAbstractItemView::EditKeyPressed</set>
+      <set>QAbstractItemView::AnyKeyPressed|QAbstractItemView::EditKeyPressed</set>
      </property>
      <property name="dragEnabled">
       <bool>true</bool>
