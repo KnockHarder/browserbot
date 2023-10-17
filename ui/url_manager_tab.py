@@ -7,6 +7,7 @@ import time
 from typing import Optional
 
 from PySide6.QtCore import Slot, Qt, QTimer
+from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QApplication, \
     QTableWidgetItem
 
@@ -45,9 +46,8 @@ class UrlManagerTabFrame(QFrame):
         tab_widget.tabCloseRequested.connect(self.archive_tab)
 
         self.load_main_data()
-        timer = QTimer(self)
-        timer.timeout.connect(self.save_to_json)
-        timer.start(5000)
+        self.schedule_to_save_data()
+        self.bind_keys()
 
     def load_main_data(self):
         path = main_data_file_path()
@@ -145,6 +145,23 @@ class UrlManagerTabFrame(QFrame):
                 json.dump(all_data, fp, ensure_ascii=False, indent=2)
         finally:
             self.is_saving = False
+
+    def schedule_to_save_data(self):
+        timer = QTimer(self)
+        timer.timeout.connect(self.save_to_json)
+        timer.start(5000)
+
+    def bind_keys(self):
+        tab_widget = self.ui.tabWidget
+
+        def switch_tab(idx: int):
+            if idx >= tab_widget.count():
+                return
+            tab_widget.setCurrentIndex(idx)
+
+        for i in range(0, 9):
+            num_key = (i + 1) % 10
+            QShortcut(f'Alt+{num_key}', self, lambda _i=i: switch_tab(_i))
 
 
 class UrlTableFrame(QFrame):
