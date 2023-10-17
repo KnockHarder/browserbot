@@ -6,19 +6,52 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>749</width>
-    <height>481</height>
+    <width>907</width>
+    <height>652</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Frame</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
+  <property name="frameShape">
+   <enum>QFrame::NoFrame</enum>
+  </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
      <item>
-      <widget class="QWidget" name="widget_3" native="true">
+      <widget class="QFrame" name="frame_3">
        <layout class="QVBoxLayout" name="verticalLayout">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QLabel" name="label_2">
           <property name="text">
@@ -47,7 +80,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QWidget" name="widget_2" native="true">
+      <widget class="QFrame" name="frame_2">
        <property name="minimumSize">
         <size>
          <width>400</width>
@@ -55,6 +88,18 @@
         </size>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QGroupBox" name="groupBox">
           <property name="minimumSize">
@@ -119,70 +164,6 @@
  <resources/>
  <connections>
   <connection>
-   <sender>pushButton_3</sender>
-   <signal>clicked()</signal>
-   <receiver>CodeGenFrame</receiver>
-   <slot>load_template_for_chat()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>477</x>
-     <y>344</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>410</x>
-     <y>448</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>pushButton_4</sender>
-   <signal>clicked()</signal>
-   <receiver>CodeGenFrame</receiver>
-   <slot>generate_code()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>437</x>
-     <y>390</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>466</x>
-     <y>442</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>CodeGenFrame</sender>
-   <signal>templateTextReset(QString)</signal>
-   <receiver>template_edit</receiver>
-   <slot>setPlainText(QString)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>330</x>
-     <y>11</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>270</x>
-     <y>78</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>CodeGenFrame</sender>
-   <signal>answerTextReset(QString)</signal>
-   <receiver>plainTextEdit_2</receiver>
-   <slot>setPlainText(QString)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>329</x>
-     <y>238</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>290</x>
-     <y>277</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>CodeGenFrame</sender>
    <signal>statusLabelTextReset(QString)</signal>
    <receiver>label</receiver>
@@ -194,7 +175,71 @@
     </hint>
     <hint type="destinationlabel">
      <x>44</x>
-     <y>458</y>
+     <y>651</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_3</sender>
+   <signal>clicked()</signal>
+   <receiver>CodeGenFrame</receiver>
+   <slot>load_template_for_chat()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>554</x>
+     <y>538</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>503</x>
+     <y>485</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_4</sender>
+   <signal>clicked()</signal>
+   <receiver>CodeGenFrame</receiver>
+   <slot>generate_code()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>669</x>
+     <y>583</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>639</x>
+     <y>634</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>CodeGenFrame</sender>
+   <signal>templateTextReset(QString)</signal>
+   <receiver>template_edit</receiver>
+   <slot>setPlainText(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>501</x>
+     <y>142</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>479</x>
+     <y>140</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>CodeGenFrame</sender>
+   <signal>answerTextReset(QString)</signal>
+   <receiver>plainTextEdit_2</receiver>
+   <slot>setPlainText(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>501</x>
+     <y>329</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>473</x>
+     <y>378</y>
     </hint>
    </hints>
   </connection>
@@ -205,12 +250,12 @@
    <slot>update_for_template_change()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>151</x>
-     <y>83</y>
+     <x>431</x>
+     <y>79</y>
     </hint>
     <hint type="destinationlabel">
-     <x>168</x>
-     <y>8</y>
+     <x>502</x>
+     <y>75</y>
     </hint>
    </hints>
   </connection>
