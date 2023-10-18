@@ -1,7 +1,9 @@
 import asyncio
+import datetime
 import os.path
 import sys
-from typing import Optional, Coroutine
+from asyncio import Task
+from typing import Optional
 
 from PySide6.QtCore import Slot, Signal
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -63,16 +65,16 @@ class GptTabCodeGenFrame(QFrame):
         self.template_file = None
         QShortcut("Ctrl+Return", self, self.generate_code)
         QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)
-        self.interruptable_list: list[(Coroutine, str)] = list()
+        self.task_info_list = list()
         QShortcut(QKeySequence.StandardKey.Cancel, self, self.cancel_future)
 
     def cancel_future(self):
-        while self.interruptable_list:
-            coro, description = self.interruptable_list.pop()
-            try:
-                coro.send(None)
-            except (StopIteration, RuntimeError):
-                self.statusLabelTextReset.emit(f'{description}被中断')
+        while self.task_info_list:
+            task_info = self.task_info_list.pop()
+            task = task_info['task']
+            task.cancel()
+            self.statusLabelTextReset.emit(f'{task.get_name()}被中断')
+            task_info['cancelCallback']()
 
     @Slot()
     def load_template_for_chat(self):
@@ -133,6 +135,9 @@ class GptTabCodeGenFrame(QFrame):
 
     @Slot()
     def generate_code(self):
+        submit_btn = self.ui.submitBtn
+        if not submit_btn.isEnabled():
+            return
         param_map = dict()
         for i in range(self.ui.variableForm.rowCount()):
             label, input_widget = self.get_variable_from_ui(i)
@@ -146,24 +151,21 @@ class GptTabCodeGenFrame(QFrame):
         except Exception:
             self.statusLabelTextReset.emit(f'模板不合法，请修正后再提交{template}')
             return
-        submit_btn = self.ui.submitBtn
 
         async def async_gen_code():
-            try:
-                answer = await gpt_util.gen_code_question(self.browser, prompt, **param_map)
-                self.answerTextReset.emit(answer)
-                self.statusLabelTextReset.emit('生成成功!')
-                self.activate_window()
-            except Exception:
-                pass
-            finally:
-                submit_btn.setEnabled(True)
+            submit_btn.setEnabled(False)
+            self.statusLabelTextReset.emit('正在生成代码...')
+            answer = await gpt_util.gen_code_question(self.browser, prompt, **param_map)
+            self.answerTextReset.emit(answer)
+            self.statusLabelTextReset.emit('生成成功!')
+            self.activate_window()
+            submit_btn.setEnabled(True)
 
-        submit_btn.setEnabled(False)
-        future = async_gen_code()
-        self.interruptable_list.append((future, '代码生成'))
-        self.statusLabelTextReset.emit('正在生成代码...')
-        asyncio.ensure_future(future)
+        self.task_info_list.append({
+            'task': asyncio.create_task(
+                async_gen_code(), name=f'{datetime.datetime.now().strftime("%H:%M:%S")} 提交的代码生成任务'),
+            'cancelCallback': lambda: submit_btn.setEnabled(True)
+        })
 
     def activate_window(self):
         parent = self.parent()
