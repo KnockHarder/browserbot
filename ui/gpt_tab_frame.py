@@ -3,7 +3,7 @@ import sys
 from typing import Optional
 
 from PySide6.QtCore import Slot, Signal
-from PySide6.QtGui import QShortcut
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QLineEdit, QLabel, QFormLayout, \
     QApplication, QMessageBox, QInputDialog
 from jinja2 import TemplateError
@@ -23,6 +23,8 @@ class GptTabFrame(QFrame):
         self.ui.setupUi(self)
 
         self.browser = get_browser()
+        QShortcut('Ctrl+Shift+Backspace', self, self.clear_chat_history)
+        QShortcut(QKeySequence.StandardKey.AddTab, self, self.new_chat)
 
     @Slot()
     def new_chat(self):
@@ -59,6 +61,7 @@ class GptTabCodeGenFrame(QFrame):
         self.browser = get_browser()
         self.template_file = None
         QShortcut("Ctrl+Return", self, self.generate_code)
+        QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)
 
     @Slot()
     def load_template_for_chat(self):
