@@ -130,6 +130,14 @@ class GptTabCodeGenFrame(QFrame):
             return
         answer = gpt_util.gen_code_question(self.browser, prompt, **param_map)
         self.answerTextReset.emit(answer)
+        self.activate_window()
+
+    def activate_window(self):
+        parent = self.parent()
+        while parent.parent():
+            parent = parent.parent()
+        parent.activateWindow()
+        parent.raise_()
 
     @staticmethod
     def get_input_widget_content(input_widget):
