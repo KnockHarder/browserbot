@@ -138,7 +138,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_4">
+            <widget class="QPushButton" name="submitBtn">
              <property name="text">
               <string>生成代码</string>
              </property>
@@ -196,7 +196,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>pushButton_4</sender>
+   <sender>submitBtn</sender>
    <signal>clicked()</signal>
    <receiver>CodeGenFrame</receiver>
    <slot>generate_code()</slot>

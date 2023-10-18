@@ -1,6 +1,7 @@
+import asyncio
 import os.path
 import sys
-from typing import Optional
+from typing import Optional, Coroutine
 
 from PySide6.QtCore import Slot, Signal
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -62,6 +63,16 @@ class GptTabCodeGenFrame(QFrame):
         self.template_file = None
         QShortcut("Ctrl+Return", self, self.generate_code)
         QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)
+        self.interruptable_list: list[(Coroutine, str)] = list()
+        QShortcut(QKeySequence.StandardKey.Cancel, self, self.cancel_future)
+
+    def cancel_future(self):
+        while self.interruptable_list:
+            coro, description = self.interruptable_list.pop()
+            try:
+                coro.send(None)
+            except (StopIteration, RuntimeError):
+                self.statusLabelTextReset.emit(f'{description}被中断')
 
     @Slot()
     def load_template_for_chat(self):
@@ -135,9 +146,24 @@ class GptTabCodeGenFrame(QFrame):
         except Exception:
             self.statusLabelTextReset.emit(f'模板不合法，请修正后再提交{template}')
             return
-        answer = gpt_util.gen_code_question(self.browser, prompt, **param_map)
-        self.answerTextReset.emit(answer)
-        self.activate_window()
+        submit_btn = self.ui.submitBtn
+
+        async def async_gen_code():
+            try:
+                answer = await gpt_util.gen_code_question(self.browser, prompt, **param_map)
+                self.answerTextReset.emit(answer)
+                self.statusLabelTextReset.emit('生成成功!')
+                self.activate_window()
+            except Exception:
+                pass
+            finally:
+                submit_btn.setEnabled(True)
+
+        submit_btn.setEnabled(False)
+        future = async_gen_code()
+        self.interruptable_list.append((future, '代码生成'))
+        self.statusLabelTextReset.emit('正在生成代码...')
+        asyncio.ensure_future(future)
 
     def activate_window(self):
         parent = self.parent()
