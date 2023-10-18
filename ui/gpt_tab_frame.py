@@ -3,6 +3,7 @@ import sys
 from typing import Optional
 
 from PySide6.QtCore import Slot, Signal
+from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QLineEdit, QLabel, QFormLayout, \
     QApplication, QMessageBox, QInputDialog
 from jinja2 import TemplateError
@@ -57,6 +58,7 @@ class GptTabCodeGenFrame(QFrame):
 
         self.browser = get_browser()
         self.template_file = None
+        QShortcut("Ctrl+Return", self, self.generate_code)
 
     @Slot()
     def load_template_for_chat(self):
@@ -123,6 +125,8 @@ class GptTabCodeGenFrame(QFrame):
             content = self.get_input_widget_content(input_widget)
             param_map[label.text()] = content
         template = self.ui.template_edit.toPlainText()
+        if not template:
+            return
         try:
             prompt = parse_template(template)
         except Exception:
