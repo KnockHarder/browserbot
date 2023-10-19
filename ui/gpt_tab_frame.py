@@ -213,6 +213,12 @@ class GptTemplateManagerFrame(QFrame):
         from ui.gpt_tab_template_manager_frame_uic import Ui_TemplateMangerFrame
         self.ui = Ui_TemplateMangerFrame()
         self.ui.setupUi(self)
+        self.bind_keys()
+
+    def bind_keys(self):
+        QShortcut(QKeySequence.StandardKey.Open, self, self.load_template)
+        QShortcut(QKeySequence.StandardKey.Save, self, self.save_template)
+        QShortcut(QKeySequence.StandardKey.Refresh, self, self.rename_template_file)
 
     @Slot()
     def load_template(self):

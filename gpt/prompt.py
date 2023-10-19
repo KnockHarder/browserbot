@@ -1,12 +1,11 @@
 import os
-import re
 import sys
 from typing import Optional
 
 from PySide6.QtCore import Slot, Signal, QSortFilterProxyModel, Qt
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QMessageBox, QComboBox, \
     QCompleter, QInputDialog, QApplication, QPushButton, QPlainTextEdit
-from langchain import PromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.prompts import load_prompt
 
 
@@ -179,13 +178,11 @@ class PromptManagementPage(QWidget):
                 QMessageBox.critical(self, '异常', '文件已存在')
 
 
-def parse_template(template) -> PromptTemplate:
-    variables = list(dict.fromkeys(re.findall(r'(?<!\{)\{([a-zA-Z_]+)}', template)))
-    template_format = 'f-string'
-    if not variables:
-        variables = list(dict.fromkeys(re.findall(r'\{\{([a-zA-Z_]+)}}', template)))
-        template_format = 'jinja2'
-    return PromptTemplate(template=template, input_variables=variables, template_format=template_format)
+def parse_template(template: str) -> PromptTemplate:
+    prompt = PromptTemplate.from_template(template, template_format='jinja2')
+    if not prompt.input_variables:
+        prompt = PromptTemplate.from_template(template)
+    return prompt
 
 
 if __name__ == '__main__':
