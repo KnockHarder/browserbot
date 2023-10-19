@@ -2,13 +2,12 @@ import os.path
 import time
 from typing import Callable
 
-from DrissionPage.chromium_element import ChromiumElement
 from bs4 import BeautifulSoup
 from langchain import prompts
 from transformers import AutoTokenizer
 
 import gpt.gpt_util as my_gpt
-from browser import Browser
+from browser import Browser, PageElement
 
 
 class Article:
@@ -17,7 +16,7 @@ class Article:
         self.content = plain_content
 
 
-def get_paragraphs_text(ele: ChromiumElement, tag_name: str) -> str:
+def get_paragraphs_text(ele: PageElement, tag_name: str) -> str:
     soup = BeautifulSoup(ele.html, 'html.parser')
     paragraphs = soup.find_all(tag_name)
     text = ''
@@ -26,7 +25,7 @@ def get_paragraphs_text(ele: ChromiumElement, tag_name: str) -> str:
     return text
 
 
-def token_size(text):
+def token_size(text: str):
     if not text:
         return 0
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
@@ -34,7 +33,7 @@ def token_size(text):
     return len(tokens)
 
 
-def summarize_article(browser, article: Article):
+def summarize_article(browser: Browser, article: Article):
     content_token = token_size(article.content)
     if not content_token:
         print(f"{article.name} has empty paragraph text")
@@ -63,16 +62,15 @@ def summarize_article(browser, article: Article):
 
 
 def read_info_q_article(browser: Browser) -> Article:
-    page = browser.page
-    return Article(page.ele('tag:h1').text,
-                   get_paragraphs_text(page.ele('.content-main')('.article-preview'), 'p'))
+    return Article(browser.search_elements('tag:h1')[0].text,
+                   get_paragraphs_text(browser.search_elements('.content-main')('.article-preview')[0], 'p'))
 
 
 def read_weixin_article(browser: Browser) -> Article:
-    page = browser.page
-    section = get_paragraphs_text(page.ele('#js_content'), 'section')
-    p = get_paragraphs_text(page.ele('#js_content'), 'p')
-    return Article(page.ele('tag:h1').text,
+    content_ele = browser.search_elements('#js_content')[0]
+    section = get_paragraphs_text(content_ele, 'section')
+    p = get_paragraphs_text(content_ele, 'p')
+    return Article(browser.search_elements('tag:h1')[0].text,
                    p if len(p) > len(section) else section)
 
 
@@ -82,8 +80,7 @@ def read_info_q_articles(browser: Browser):
 
 
 def read_wx_articles(browser: Browser):
-    read_all_page_articles(browser.page, 'https://mp.weixin.qq.com/s/',
-                           lambda page: read_weixin_article(page))
+    read_all_page_articles(browser, 'https://mp.weixin.qq.com/s/', read_weixin_article)
 
 
 def read_all_page_articles(browser: Browser, article_url_prefix,
@@ -106,18 +103,10 @@ def read_all_page_articles(browser: Browser, article_url_prefix,
 
 
 def open_info_q_mail_urls(browser: Browser):
-    urls = {x.attr('href') for x in browser.page.eles('tag:a@href:https://etrack01')}
+    urls = {x.attributes['href'] for x in browser.search_elements('tag:a@href:https://etrack01')}
     for u in urls:
-        browser.page.new_tab(url=u, switch_to=False)
+        browser.to_url_or_open(url=u, new_tab=True)
 
 
 if __name__ == '__main__':
-    def print_ele(ele):
-        if isinstance(ele, list):
-            print(len(ele))
-            _ = [print(x) for x in ele]
-        else:
-            print(ele)
-
-
     read_wx_articles(Browser())

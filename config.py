@@ -1,14 +1,8 @@
 import os.path
 
-from DrissionPage import ChromiumPage
-
 from browser import Browser
 
 DATA_DIR = os.path.expanduser('~/.my_py_datas')
-
-
-def get_real_browser() -> ChromiumPage:
-    return ChromiumPage()
 
 
 def get_browser() -> Browser:
