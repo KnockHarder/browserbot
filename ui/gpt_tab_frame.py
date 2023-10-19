@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QLin
 from jinja2 import TemplateError
 from langchain.prompts import load_prompt, PromptTemplate
 
-from config import get_browser, gpt_prompt_file_dir
+from config import get_real_browser, gpt_prompt_file_dir
 from gpt import gpt_util
 from gpt.prompt import parse_template
 
@@ -25,7 +25,7 @@ class GptTabFrame(QFrame):
         self.ui = Ui_GptPageFrame()
         self.ui.setupUi(self)
 
-        self.browser = get_browser()
+        self.browser = get_real_browser()
         QShortcut('Ctrl+Shift+Backspace', self, self.clear_chat_history)
         QShortcut(QKeySequence.StandardKey.AddTab, self, self.new_chat)
 
@@ -61,7 +61,7 @@ class GptTabCodeGenFrame(QFrame):
         self.ui = Ui_CodeGenFrame()
         self.ui.setupUi(self)
 
-        self.browser = get_browser()
+        self.browser = get_real_browser()
         self.template_file = None
         QShortcut("Ctrl+Return", self, self.generate_code)
         QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)

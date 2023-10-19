@@ -2,17 +2,22 @@ import os.path
 import time
 from typing import Callable
 
-from DrissionPage import ChromiumPage
 from DrissionPage.chromium_element import ChromiumElement
 from bs4 import BeautifulSoup
 from langchain import prompts
 from transformers import AutoTokenizer
 
-import chromium_utils as my_ch
 import gpt.gpt_util as my_gpt
+from browser import Browser
 
 
-def get_paragraphs_text(ele: ChromiumElement, tag_name: str):
+class Article:
+    def __init__(self, title: str, plain_content: str):
+        self.name = title
+        self.content = plain_content
+
+
+def get_paragraphs_text(ele: ChromiumElement, tag_name: str) -> str:
     soup = BeautifulSoup(ele.html, 'html.parser')
     paragraphs = soup.find_all(tag_name)
     text = ''
@@ -29,10 +34,10 @@ def token_size(text):
     return len(tokens)
 
 
-def summarize_article(browser, title, paragraphs_text):
-    content_token = token_size(paragraphs_text)
+def summarize_article(browser, article: Article):
+    content_token = token_size(article.content)
     if not content_token:
-        print(f"{title} has empty paragraph text")
+        print(f"{article.name} has empty paragraph text")
         return
     template_dir = os.path.expanduser('~/.my_py_datas/chatgpt/templates')
     instruction_prompt = prompts.load_prompt(os.path.join(template_dir, '文章阅读_指令.json'))
@@ -42,10 +47,10 @@ def summarize_article(browser, title, paragraphs_text):
     prompt_token_size = max([token_size(part_content_prompt.format(content='')),
                              token_size(end_content_prompt.format(content=''))])
     token_limit = 4096 - prompt_token_size
-    my_gpt.ask_as_new_chat_and_wait(browser, instruction_prompt.format(article_name=title))
-    text_len_limit = int(len(paragraphs_text) / content_token * token_limit)
+    my_gpt.ask_as_new_chat_and_wait(browser, instruction_prompt.format(article_name=article.name))
+    text_len_limit = int(len(article.content) / content_token * token_limit)
     text = ''
-    for line in paragraphs_text.split('\n'):
+    for line in article.content.split('\n'):
         if len(line) > text_len_limit:
             raise Exception('To long paragraph')
         if len(text) + len(line) > 4096:
@@ -57,47 +62,53 @@ def summarize_article(browser, title, paragraphs_text):
         my_gpt.continue_ask_and_wait(browser, end_content_prompt.format(content=text))
 
 
-def read_info_q_articles(browser: ChromiumPage):
-    def get_article_content(bws: ChromiumPage):
-        return (bws.ele('tag:h1').text,
-                get_paragraphs_text(bws.ele('.content-main')('.article-preview'), 'p'))
-
-    read_all_page_articles(browser, 'https://www.infoq.cn/article', get_article_content)
-    read_all_page_articles(browser, 'https://www.infoq.cn/news/', get_article_content)
+def read_info_q_article(browser: Browser) -> Article:
+    page = browser.page
+    return Article(page.ele('tag:h1').text,
+                   get_paragraphs_text(page.ele('.content-main')('.article-preview'), 'p'))
 
 
-def read_wx_articles(browser: ChromiumPage):
-    def get_wx_paragraphs_text(page: ChromiumPage):
-        section = get_paragraphs_text(page.ele('#js_content'), 'section')
-        p = text = get_paragraphs_text(page.ele('#js_content'), 'p')
-        return p if len(p) > len(section) else section
-
-    read_all_page_articles(browser, 'https://mp.weixin.qq.com/s/',
-                           lambda page: (page.ele('tag:h1').text, get_wx_paragraphs_text(page)))
+def read_weixin_article(browser: Browser) -> Article:
+    page = browser.page
+    section = get_paragraphs_text(page.ele('#js_content'), 'section')
+    p = get_paragraphs_text(page.ele('#js_content'), 'p')
+    return Article(page.ele('tag:h1').text,
+                   p if len(p) > len(section) else section)
 
 
-def read_all_page_articles(browser, article_url_prefix,
-                           article_content_func: Callable[[ChromiumPage], tuple[str, str]]):
-    tabs = my_ch.find_all_tab_id(browser, article_url_prefix)
-    if not tabs:
+def read_info_q_articles(browser: Browser):
+    read_all_page_articles(browser, 'https://www.infoq.cn/article', read_info_q_article)
+    read_all_page_articles(browser, 'https://www.infoq.cn/news/', read_info_q_article)
+
+
+def read_wx_articles(browser: Browser):
+    read_all_page_articles(browser.page, 'https://mp.weixin.qq.com/s/',
+                           lambda page: read_weixin_article(page))
+
+
+def read_all_page_articles(browser: Browser, article_url_prefix,
+                           article_content_func: Callable[[Browser], Article]):
+    tab_list = browser.all_tab_with_prefix(article_url_prefix)
+    if not tab_list:
         print('Cannot find any article tab', article_url_prefix)
         return
-    for idx, tab in enumerate(tabs):
+    while tab_list:
+        tab = tab_list.pop()
         browser.to_tab(tab)
-        title, paragraphs = article_content_func(browser)
-        if not title or not paragraphs:
-            print('No title or paragraph content', browser.url)
+        article = article_content_func(browser)
+        if not article.name or not article.content:
+            print('No title or paragraph content', tab.url)
             continue
-        summarize_article(browser, title, paragraphs)
-        if idx + 1 < len(tabs):
-            while tab in my_ch.find_all_tab_id(browser, article_url_prefix):
+        summarize_article(browser, article)
+        if tab_list:
+            while browser.is_tab_alive(tab):
                 time.sleep(1)
 
 
-def open_info_q_mail_urls(browser: ChromiumPage):
-    urls = {x.attr('href') for x in browser.eles('tag:a@href:https://etrack01')}
+def open_info_q_mail_urls(browser: Browser):
+    urls = {x.attr('href') for x in browser.page.eles('tag:a@href:https://etrack01')}
     for u in urls:
-        browser.new_tab(url=u, switch_to=False)
+        browser.page.new_tab(url=u, switch_to=False)
 
 
 if __name__ == '__main__':
@@ -109,4 +120,4 @@ if __name__ == '__main__':
             print(ele)
 
 
-    read_wx_articles(ChromiumPage())
+    read_wx_articles(Browser())

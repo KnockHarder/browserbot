@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QAppli
 
 import url_manager_frame_rc
 from chromium_utils import go_url
-from config import get_browser
+from config import get_real_browser
 from config import url_table_data_dir
 from mywidgets import MarkdownItemDelegate
 
@@ -183,7 +183,7 @@ class UrlTableFrame(QFrame):
         table_widget.cellDoubleClicked.connect(self.go_cell_url)
         table_widget.cellChanged.connect(self.update_cell_data)
 
-        self.browser = get_browser()
+        self.browser = get_real_browser()
 
     def init_row(self, row):
         table_widget = self.ui.tableWidget

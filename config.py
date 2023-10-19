@@ -2,11 +2,17 @@ import os.path
 
 from DrissionPage import ChromiumPage
 
+from browser import Browser
+
 DATA_DIR = os.path.expanduser('~/.my_py_datas')
 
 
-def get_browser() -> ChromiumPage:
+def get_real_browser() -> ChromiumPage:
     return ChromiumPage()
+
+
+def get_browser() -> Browser:
+    return Browser()
 
 
 def gpt_prompt_file_dir() -> str:
