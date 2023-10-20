@@ -249,7 +249,7 @@ class Browser:
             tab = self.find_tab_by_url_prefix(url)
             if tab:
                 page.to_tab(tab.id, activate)
-            return
+                return
         if page.is_alive:
             page.new_tab(url, activate)
             return

@@ -204,7 +204,7 @@ class UrlTableFrame(QFrame):
         try:
             url = self.get_row_bind_data(row)['url']
             if url:
-                self.browser.find_and_switch(url, activate=True)
+                self.browser.to_url_or_open(url, activate=True)
         except TypeError:
             pass
 
