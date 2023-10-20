@@ -11,31 +11,6 @@ FIND_INTERVAL = .5
 TIMEOUT = 5.
 
 
-def loop_event():
-    loop = asyncio.get_event_loop()
-    if loop:
-        return loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    return loop
-
-
-async def find_elements_sync(find_func: Callable[[], list[ChromiumElement]], timeout) -> list[ChromiumElement]:
-    end = time.perf_counter() + timeout
-    while True:
-        elements = find_func()
-        if elements:
-            return elements
-        if time.perf_counter() >= end:
-            return []
-        await asyncio.sleep(FIND_INTERVAL)
-
-
-def find_elements_until(find_func: Callable[[], list[ChromiumElement]], timeout) -> list[ChromiumElement]:
-    return loop_event().run_until_complete(
-        find_elements_sync(find_func, timeout))
-
-
 class TabInfo:
     def __init__(self, tab_id: str, url: str, title: str):
         self.id = tab_id
@@ -54,9 +29,13 @@ class ElementNotFoundError(Exception):
 
 
 class PageElement:
-    def __init__(self, element: ChromiumElement, loc_str):
+    def __init__(self, element: ChromiumElement, loc_desc):
         self.element = element
-        self.loc_str = loc_str
+        self.loc_desc = loc_desc
+
+    @property
+    def pseudo_before(self):
+        return self.element.pseudo.before
 
     @property
     def pseudo_after(self):
@@ -75,7 +54,7 @@ class PageElement:
 
     @property
     def parent(self) -> "PageElement":
-        return PageElement(self.element.parent(), f'{self.loc_str}->parent')
+        return PageElement(self.element.parent(), f'{self.loc_desc}-> parent')
 
     @property
     def attributes(self):
@@ -89,17 +68,20 @@ class PageElement:
         input_ele.input(Keys.ENTER)
 
     def search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
-        return DomSearcher([self.element], self.loc_str)(loc_str, timeout)
+        return DomSearcher([self], self.loc_desc)(loc_str, timeout)
+
+    async def async_search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
+        return await DomSearcher([self], self.loc_desc).async_search(loc_str, timeout)
 
     def child_at(self, idx: int) -> "PageElement":
         children = self.element.children()
-        loc_str = f'{self.loc_str}[{idx}]'
+        loc_desc = f'{self.loc_desc}-> childAt[{idx}]'
         if idx < 0 or idx >= len(children):
-            raise ElementNotFoundError(loc_str)
-        return PageElement(children[idx], loc_str)
+            raise ElementNotFoundError(loc_desc)
+        return PageElement(children[idx], loc_desc)
 
     def to_filter(self, func: Callable[["PageElement"], bool]):
-        return DomFilter(iter([self.element]), self.loc_str)(func)
+        return DomFilter(iter([self]))(func)
 
 
 class PageElementAttributes(object):
@@ -129,81 +111,108 @@ class PageElementAttributes(object):
 
 
 class DomFilter:
-    def __init__(self, elements: Iterator[ChromiumElement], loc_str: str):
+    def __init__(self, elements: Iterator[PageElement]):
         self.elements = elements
-        self.loc_str = loc_str
 
     def __call__(self, func: Callable[[PageElement], bool]) -> "DomFilter":
+        def do_filter(element: PageElement) -> bool:
+            usable = func(element)
+            if usable:
+                func_name = func.__name__
+                if '<lambda>' == func_name:
+                    func_name += f'{func.__module__}{func.__code__.co_lines()}'
+                element.loc_desc = f'{element.loc_desc}-> {func_name}'
+            return usable
+
         if not self.elements:
             return self
-        return DomFilter(filter(lambda x: func(x.element), self.elements), self.loc_str)
+        return DomFilter(filter(do_filter, self.elements))
 
-    def next(self) -> Optional[PageElement]:
-        element = next(self.elements, None)
-        return PageElement(element, self.loc_str) if element else None
+    def first(self) -> Optional[PageElement]:
+        return next(self.elements, None)
 
     def to_searcher(self) -> "DomSearcher":
-        return DomSearcher(list(self.elements), self.loc_str)
+        return DomSearcher(list(self.elements), 'filter')
 
 
 class DomSearcher:
-    def __init__(self, elements: list[ChromiumElement], loc_str: str):
+    def __init__(self, elements: list[PageElement], source_loc: str):
+        self.loc_desc = source_loc
         self.elements = elements
-        self.loc_str = loc_str
 
     def __call__(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
-        async def async_do() -> "DomSearcher":
-            return await self._async_do(lambda e: e.eles(loc_str, timeout=0),
-                                        f'{self.loc_str} -> {loc_str}', timeout)
-
         if not self.elements:
             return self
+        return self._search_all(lambda e: e.eles(loc_str, timeout=0),
+                                loc_str, timeout)
 
-        return loop_event().run_until_complete(async_do())
+    def _search_all(self, find_no_wait: Callable[[ChromiumElement], list[ChromiumElement]],
+                    loc_desc: str, timeout: float) -> "DomSearcher":
+        end = time.perf_counter() + timeout
+        all_found: list[PageElement] = []
+        elements = self.elements
+        while True:
+            found, elements = _search_all_no_wait(elements, find_no_wait, loc_desc)
+            all_found += found
+            if elements and time.perf_counter() < end:
+                time.sleep(1)
+            else:
+                return DomSearcher(all_found, f'{self.loc_desc}-> {loc_desc}')
+
+    async def async_search(self, loc_str, timeout) -> "DomSearcher":
+        end = time.perf_counter() + timeout
+        all_found: list[PageElement] = []
+        elements = self.elements
+        while True:
+            found, elements = _search_all_no_wait(elements, lambda e: e.eles(loc_str, timeout=0), loc_str)
+            all_found += found
+            if elements and time.perf_counter() < end:
+                await asyncio.sleep(1)
+            else:
+                return DomSearcher(all_found, f'{self.loc_desc}-> {loc_str}')
 
     def __getitem__(self, idx: int) -> PageElement:
         length = len(self.elements)
         if idx < -length or idx >= length:
-            raise ElementNotFoundError(self.loc_str, f'idx={idx}')
-        return PageElement(self.elements[idx], f'{self.loc_str}[{idx}]')
+            raise ElementNotFoundError(f'{self.loc_desc}[{idx}]')
+        return self.elements[idx]
 
     def __len__(self):
         return len(self.elements)
 
-    async def _async_do(self, find_func: Callable[[ChromiumElement], list[ChromiumElement]],
-                        loc_str, timeout) -> "DomSearcher":
-        end = time.perf_counter() + timeout
-        all_found = []
-        elements = self.elements
-        while True:
-            if not elements:
-                return DomSearcher(all_found, loc_str)
-            failed = list()
-            for element in elements:
-                found = find_func(element)
-                if found:
-                    all_found += found
-                else:
-                    failed.append(element)
-            if time.perf_counter() >= end:
-                return DomSearcher(all_found, loc_str)
-            elements = failed
-            await asyncio.sleep(FIND_INTERVAL)
+    def __iter__(self):
+        return iter(self.elements)
 
     def to_filter(self, func: Callable[[PageElement], bool]):
-        return DomFilter(iter(self.elements), self.loc_str)(func)
+        return DomFilter(iter(self.elements))(func)
 
-    def next(self) -> Optional[PageElement]:
-        return PageElement(self.elements[0], self.loc_str) if self.elements else None
+    def first(self) -> Optional[PageElement]:
+        return self.elements[0] if self.elements else None
 
     def search_after_siblings_nodes(self, loc_str=None, timeout=TIMEOUT) -> "DomSearcher":
-        async def async_do() -> DomSearcher:
-            full = f'{self.loc_str}->siblings_after'
-            if loc_str:
-                full += f'->{loc_str}'
-            return await self._async_do(lambda e: e.nexts(loc_str, 0, True), full, timeout)
+        def do_find(element: ChromiumElement) -> list[ChromiumElement]:
+            return element.nexts(loc_str, 0)
 
-        return loop_event().run_until_complete(async_do())
+        loc_desc = f'-> siblings_after'
+        if loc_str:
+            loc_desc += f'-> {loc_str}'
+        return self._search_all(do_find, loc_desc, timeout)
+
+
+def _search_all_no_wait(elements: list[PageElement],
+                        find_func: Callable[[ChromiumElement], list[ChromiumElement]],
+                        loc_desc: str) -> tuple[list[PageElement], list[PageElement]]:
+    if not elements:
+        return [], []
+    all_found: list[PageElement] = []
+    failed: list[PageElement] = []
+    for element in elements:
+        found: list[ChromiumElement] = find_func(element.element)
+        if found:
+            all_found += [PageElement(x, f'{element.loc_desc}-> {loc_desc}') for x in found]
+        else:
+            failed.append(element)
+    return all_found, failed
 
 
 class Browser:
@@ -265,8 +274,18 @@ class Browser:
         self.page.get(url)
 
     def search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
-        elements = find_elements_until(lambda: self.page.eles(loc_str, timeout=0), timeout)
-        return DomSearcher(elements, loc_str)
+        return DomSearcher([PageElement(x, loc_str) for x
+                            in self.page.eles(loc_str, timeout=timeout)], '$')
+
+    async def async_search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
+        end = time.perf_counter() + timeout
+        while True:
+            elements = self.page.eles(loc_str, timeout=0)
+            if elements or time.perf_counter() >= end:
+                break
+            else:
+                await asyncio.sleep(FIND_INTERVAL)
+        return DomSearcher([PageElement(x, loc_str) for x in elements], '$')
 
 
 if __name__ == '__main__':

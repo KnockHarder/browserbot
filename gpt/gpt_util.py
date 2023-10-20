@@ -3,9 +3,9 @@ import time
 from typing import Any
 
 from bs4 import BeautifulSoup
-from langchain import BasePromptTemplate
+from langchain.prompts import BasePromptTemplate
 
-from browser import Browser, ElementNotFoundError
+from browser import Browser, ElementNotFoundError, PageElement
 
 HOME_PAGE = 'https://chat.openai.com'
 
@@ -27,18 +27,36 @@ def continue_ask(browser: Browser, ques: str):
 async def gen_code_question(browser: Browser, prompt: BasePromptTemplate, **kwargs: Any):
     browser.find_and_switch(HOME_PAGE)
     ask_as_new_chat(browser, prompt.format(**kwargs))
-    while True:
-        try:
-            code_ele = browser.search_elements(
-                'css:#__next main div.text-token-text-primary code', timeout=0.1)[0]
-            if code_ele.pseudo_after == 'none':
-                break
-        except ElementNotFoundError:
-            pass
+
+    main_ele = None
+    while not main_ele:
+        main_ele = (await browser.async_search_elements('css:#__next main')).first()
+    chats = []
+    while (not chats
+           or len(chats) <
+           2 or not (await is_answer_finished(chats[-1]))):
+        chats = await main_ele.async_search_elements('css: div.text-token-text-primary')
         await asyncio.sleep(1)
-    text = BeautifulSoup(code_ele.html, 'html.parser').get_text()
+    code = (await chats[-1].async_search_elements('tag:code')).first()
+    text = BeautifulSoup(code.html if code else chats[-1], 'html.parser').get_text()
     code_text = text
     return code_text
+
+
+async def is_answer_finished(element: PageElement):
+    if not element.text:
+        return False
+    contents = []
+    contents += await element.async_search_elements('tag:p', timeout=0)
+    contents += await element.async_search_elements('tag:li', timeout=0)
+    contents += await element.async_search_elements('tag:code', timeout=0)
+    return contents and all(is_element_finished(x) for x in contents)
+
+
+def is_element_finished(element: PageElement):
+    if element.pseudo_before == element.pseudo_after == '"`"':
+        return True
+    return element.pseudo_after == 'none'
 
 
 def clear_chat_history(browser: Browser):
