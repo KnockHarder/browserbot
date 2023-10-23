@@ -116,7 +116,7 @@ class GptTabCodeGenFrame(QFrame):
         variable_from_box = self.ui.groupBox
 
         def create_value_input(l_var: str, value: str, is_last: bool):
-            if 'code' in l_var or is_last:
+            if 'code' in l_var or 'desc' in l_var or is_last:
                 edit = QPlainTextEdit(variable_from_box)
                 set_text_func = edit.setPlainText
             else:

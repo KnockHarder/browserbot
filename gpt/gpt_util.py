@@ -37,8 +37,11 @@ async def gen_code_question(browser: Browser, prompt: BasePromptTemplate, **kwar
            2 or not (await is_answer_finished(chats[-1]))):
         chats = await main_ele.async_search_elements('css: div.text-token-text-primary')
         await asyncio.sleep(1)
-    code = (await chats[-1].async_search_elements('tag:code')).first()
-    text = BeautifulSoup(code.html if code else chats[-1], 'html.parser').get_text()
+    codes = (await chats[-1].async_search_elements('tag:code'))
+    if codes:
+        text = ('\n'*2).join([BeautifulSoup(x.html, 'html.parser').get_text() for x in codes])
+    else:
+        text = BeautifulSoup(chats[-1].html, 'html.parser').get_text()
     code_text = text
     return code_text
 
