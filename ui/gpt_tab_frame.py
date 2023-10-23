@@ -30,7 +30,7 @@ class GptTabFrame(QFrame):
 
     @Slot()
     def new_chat(self):
-        gpt_util.start_new_chat(self.browser)
+        gpt_util.start_new_chat(self.browser, True)
 
     @Slot()
     def clear_chat_history(self):
@@ -113,21 +113,21 @@ class GptTabCodeGenFrame(QFrame):
             input_widget.deleteLater()
         while variable_form.rowCount() > 0:
             variable_form.removeRow(0)
-        variable_from_box = self.ui.groupBox
+        variable_form_box = self.ui.groupBox
 
         def create_value_input(l_var: str, value: str, is_last: bool):
             if 'code' in l_var or 'desc' in l_var or is_last:
-                edit = QPlainTextEdit(variable_from_box)
+                edit = QPlainTextEdit(variable_form_box)
                 set_text_func = edit.setPlainText
             else:
-                edit = QLineEdit(variable_from_box)
+                edit = QLineEdit(variable_form_box)
                 set_text_func = edit.setText
             if value:
                 set_text_func(value)
             return edit
 
         for idx, vrb in enumerate(variables):
-            label = QLabel(vrb, variable_from_box)
+            label = QLabel(vrb, variable_form_box)
             widget = create_value_input(vrb, value_dict.get(vrb),
                                         idx == len(variables) - 1)
             variable_form.addRow(label, widget)

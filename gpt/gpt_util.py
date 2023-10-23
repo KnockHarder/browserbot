@@ -10,8 +10,8 @@ from browser import Browser, ElementNotFoundError, PageElement
 HOME_PAGE = 'https://chat.openai.com'
 
 
-def start_new_chat(browser: Browser):
-    browser.find_and_switch(HOME_PAGE)
+def start_new_chat(browser: Browser, activate=False):
+    browser.find_and_switch(HOME_PAGE, activate)
     browser.search_elements('tag:a@@text()=New Chat')[0].click()
 
 

@@ -35,9 +35,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="styleSheet">
-      <string notr="true">QTabWidget::pane {
-	padding: 0px -20px;
-}</string>
+      <string notr="true"/>
      </property>
      <property name="currentIndex">
       <number>-1</number>
