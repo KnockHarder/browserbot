@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from typing import Optional
 
 from PySide6.QtCore import Slot, Qt, QTimer
@@ -54,7 +55,7 @@ class UrlManagerTabFrame(QFrame):
             return
         tabs = read_tab_data_from_file(path)
         for data in tabs:
-            self.create_tab_from_data(data['tabName'], data['urls'])
+            self.create_tab_from_data(data['tabName'], data['urls'], data.get('id'))
 
     @Slot()
     def add_tab(self):
@@ -68,9 +69,9 @@ class UrlManagerTabFrame(QFrame):
         dialog.textValueSelected.connect(create_new_tab)
         dialog.open()
 
-    def create_tab_from_data(self, tab_name: str, urls: list = None):
+    def create_tab_from_data(self, tab_name: str, urls: list = None, table_id: str = None):
         tab_widget = self.ui.tabWidget
-        frame = UrlTableFrame(tab_widget)
+        frame = UrlTableFrame(tab_widget, table_id)
         frame.update_table(urls)
         tab_widget.addTab(frame, tab_name)
         return tab_widget.count() - 1
@@ -89,7 +90,7 @@ class UrlManagerTabFrame(QFrame):
 
             def load_tab_selected(tab_name: str):
                 data = next(filter(lambda x: x['tabName'] == tab_name, tabs), None)
-                idx = self.create_tab_from_data(tab_name, data['urls'])
+                idx = self.create_tab_from_data(tab_name, data['urls'], data.get('id'))
                 self.ui.tabWidget.setCurrentIndex(idx)
 
             dialog1.textValueSelected.connect(load_tab_selected)
@@ -105,8 +106,9 @@ class UrlManagerTabFrame(QFrame):
         table_frame: UrlTableFrame = tab_widget.widget(index)
         month_file = month_data_file_path()
         file_tabs = read_tab_data_from_file(month_file)
-        file_tabs = list(filter(lambda x: x['tabName'] != tab_name, file_tabs))
+        file_tabs = list(filter(lambda x: x['id'] != table_frame.id and x['tabName'] != tab_name, file_tabs))
         file_tabs.append({
+            "id": table_frame.id,
             "tabName": tab_name,
             "urls": table_frame.get_url_datas()
         })
@@ -137,6 +139,7 @@ class UrlManagerTabFrame(QFrame):
             for idx in range(tab_widget.count()):
                 table_frame: UrlTableFrame = tab_widget.widget(idx)
                 all_data.append({
+                    "id": table_frame.id,
                     "tabName": tab_widget.tabText(idx),
                     "urls": table_frame.get_url_datas()
                 })
@@ -166,7 +169,7 @@ class UrlManagerTabFrame(QFrame):
 class UrlTableFrame(QFrame):
     URL_DATA_ROLE = Qt.ItemDataRole.UserRole + 1
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None, table_id: str = None):
         super().__init__(parent)
 
         from ui.url_manager_table_frame_uic import Ui_Frame as UiTableFrame
@@ -183,6 +186,9 @@ class UrlTableFrame(QFrame):
         table_widget.cellChanged.connect(self.update_cell_data)
 
         self.browser = get_browser()
+        if not table_id:
+            table_id = str(uuid.uuid1())
+        self.id = table_id
 
     def init_row(self, row):
         table_widget = self.ui.tableWidget
