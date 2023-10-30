@@ -4,10 +4,10 @@ import os.path
 import sys
 from typing import Optional
 
-from PySide6.QtCore import Slot, Signal
+from PySide6.QtCore import Slot, Signal, Qt
 from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QLineEdit, QLabel, QFormLayout, \
-    QApplication, QMessageBox, QInputDialog
+from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QApplication, QMessageBox, \
+    QInputDialog, QTableWidgetItem
 from jinja2 import TemplateError
 from langchain.prompts import load_prompt, PromptTemplate
 
@@ -49,9 +49,11 @@ def safe_parse_template(parent: QWidget, template: str) -> Optional[PromptTempla
 
 
 class GptTabCodeGenFrame(QFrame):
+    ROLE_IS_STATIC_ROW = Qt.ItemDataRole.UserRole + 1
     templateTextReset = Signal(str)
     statusLabelTextReset = Signal(str)
     answerTextReset = Signal(str)
+    template_edit_widget: QPlainTextEdit
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -62,10 +64,25 @@ class GptTabCodeGenFrame(QFrame):
 
         self.browser = get_browser()
         self.template_file = None
+        self.init_prompt_inputs()
         QShortcut("Ctrl+Return", self, self.generate_code)
         QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)
         self.task_info_list = list()
         QShortcut(QKeySequence.StandardKey.Cancel, self, self.cancel_future)
+
+    def init_prompt_inputs(self):
+        table = self.ui.prompt_input_table
+        table.setColumnCount(1)
+        table.verticalHeader().setLineWidth(0)
+
+        table.insertRow(0)
+        item = QTableWidgetItem('模板')
+        item.setData(self.ROLE_IS_STATIC_ROW, True)
+        table.setVerticalHeaderItem(0, item)
+        self.template_edit_widget = QPlainTextEdit(table)
+        self.templateTextReset.connect(self.template_edit_widget.setPlainText)
+        self.template_edit_widget.textChanged.connect(self.update_for_template_change)
+        table.setCellWidget(0, 0, self.template_edit_widget)
 
     def cancel_future(self):
         while self.task_info_list:
@@ -93,56 +110,54 @@ class GptTabCodeGenFrame(QFrame):
 
     @Slot()
     def update_for_template_change(self):
-        template = self.ui.template_edit.toPlainText()
+        template = self.template_edit_widget.toPlainText()
         self.statusLabelTextReset.emit('模板被修改')
         self.update_variable_form(template)
 
-    def update_variable_form(self, template):
+    def update_variable_form(self, template: str):
         try:
             prompt = parse_template(template)
         except Exception:
             self.statusLabelTextReset.emit('模板不合法')
             return
-        variables = prompt.input_variables
-        value_dict = dict()
-        variable_form = self.ui.variableForm
-        for label, input_widget in [self.get_variable_from_ui(i) for i in range(variable_form.rowCount())]:
-            if label.text() in variables:
-                value_dict[label.text()] = self.get_input_widget_content(input_widget)
-            label.deleteLater()
-            input_widget.deleteLater()
-        while variable_form.rowCount() > 0:
-            variable_form.removeRow(0)
-        variable_form_box = self.ui.groupBox
-
-        def create_value_input(l_var: str, value: str, is_last: bool):
-            if 'code' in l_var or 'desc' in l_var or is_last:
-                edit = QPlainTextEdit(variable_form_box)
-                set_text_func = edit.setPlainText
+        table = self.ui.prompt_input_table
+        start_row = self.static_row_count(table)
+        variables = sorted(prompt.input_variables, key=lambda x: template.index(x))
+        for idx, variable in enumerate(variables):
+            row = next(filter(lambda x: table.verticalHeaderItem(x).text() == variable, range(table.rowCount())))
+            if not row:
+                row = start_row + idx
+                table.insertRow(row)
+                table.setVerticalHeaderItem(row, QTableWidgetItem(variable))
+                edit_widget = QPlainTextEdit(table)
+                table.setCellWidget(row, 0, edit_widget)
+            elif row < start_row:
+                raise ValueError(f'变量{variable}与静态变量重复')
+        row = start_row
+        while row < table.rowCount():
+            variable = table.verticalHeaderItem(row).text()
+            try:
+                idx = variables.index(variable)
+            except ValueError:
+                table.cellWidget(row, 0).deleteLater()
+                table.removeRow(row)
+                continue
+            if start_row + idx != row:
+                header = table.verticalHeader()
+                header.moveSection(header.logicalIndex(row), header.logicalIndex(idx + start_row))
             else:
-                edit = QLineEdit(variable_form_box)
-                set_text_func = edit.setText
-            if value:
-                set_text_func(value)
-            return edit
+                row += 1
 
-        for idx, vrb in enumerate(variables):
-            label = QLabel(vrb, variable_form_box)
-            widget = create_value_input(vrb, value_dict.get(vrb),
-                                        idx == len(variables) - 1)
-            variable_form.addRow(label, widget)
+    def static_row_count(self, table):
+        return len([i for i in range(table.rowCount())
+                    if table.verticalHeaderItem(i).data(self.ROLE_IS_STATIC_ROW) == True])
 
     @Slot()
     def generate_code(self):
         submit_btn = self.ui.submitBtn
         if not submit_btn.isEnabled():
             return
-        param_map = dict()
-        for i in range(self.ui.variableForm.rowCount()):
-            label, input_widget = self.get_variable_from_ui(i)
-            content = self.get_input_widget_content(input_widget)
-            param_map[label.text()] = content
-        template = self.ui.template_edit.toPlainText()
+        template = self.template_edit_widget.toPlainText()
         if not template:
             return
         try:
@@ -150,6 +165,13 @@ class GptTabCodeGenFrame(QFrame):
         except Exception:
             self.statusLabelTextReset.emit(f'模板不合法，请修正后再提交{template}')
             return
+        param_map = dict()
+        table = self.ui.prompt_input_table
+        row_start = self.static_row_count(table)
+        for i in range(row_start, table.rowCount()):
+            variable = table.verticalHeaderItem(i).text()
+            input_widget = table.cellWidget(i, 0)
+            param_map[variable] = input_widget.toPlainText()
 
         async def async_gen_code():
             submit_btn.setEnabled(False)
@@ -173,17 +195,6 @@ class GptTabCodeGenFrame(QFrame):
         parent.activateWindow()
         parent.raise_()
 
-    @staticmethod
-    def get_input_widget_content(input_widget):
-        return input_widget.text() if isinstance(input_widget, QLineEdit) \
-            else input_widget.toPlainText()
-
-    def get_variable_from_ui(self, row) -> (QLabel, QWidget):
-        variable_form = self.ui.variableForm
-        label = variable_form.itemAt(row, QFormLayout.ItemRole.LabelRole).widget()
-        input_widget = variable_form.itemAt(row, QFormLayout.ItemRole.FieldRole).widget()
-        return label, input_widget
-
     @Slot()
     def save_template(self):
         default_path = self.template_file if self.template_file else gpt_prompt_file_dir()
@@ -191,7 +202,7 @@ class GptTabCodeGenFrame(QFrame):
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
 
         def save_template_to_file(path: str):
-            template = self.ui.template_edit.toPlainText()
+            template = self.template_edit_widget.toPlainText()
             prompt = safe_parse_template(self, template)
             if not prompt:
                 return
@@ -283,7 +294,7 @@ class GptTemplateManagerFrame(QFrame):
 if __name__ == '__main__':
     def main():
         app = QApplication()
-        frame = GptTemplateManagerFrame()
+        frame = GptTabCodeGenFrame()
         frame.show()
         sys.exit(app.exec())
 

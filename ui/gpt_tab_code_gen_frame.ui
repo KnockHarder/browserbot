@@ -38,6 +38,16 @@
       <number>0</number>
      </property>
      <item>
+      <widget class="QTableWidget" name="prompt_input_table">
+       <attribute name="horizontalHeaderVisible">
+        <bool>false</bool>
+       </attribute>
+       <attribute name="horizontalHeaderStretchLastSection">
+        <bool>true</bool>
+       </attribute>
+      </widget>
+     </item>
+     <item>
       <widget class="QFrame" name="frame_3">
        <layout class="QVBoxLayout" name="verticalLayout">
         <property name="leftMargin">
@@ -52,30 +62,6 @@
         <property name="bottomMargin">
          <number>0</number>
         </property>
-        <item>
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>提示词模板</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPlainTextEdit" name="template_edit"/>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>回答</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPlainTextEdit" name="plainTextEdit_2">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
        </layout>
       </widget>
      </item>
@@ -102,33 +88,22 @@
         </property>
         <item>
          <widget class="QGroupBox" name="groupBox">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>0</height>
-           </size>
-          </property>
           <property name="title">
-           <string>模板参数</string>
+           <string>回答</string>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_4">
-           <item>
-            <layout class="QFormLayout" name="variableForm">
-             <property name="fieldGrowthPolicy">
-              <enum>QFormLayout::ExpandingFieldsGrow</enum>
-             </property>
-             <property name="rowWrapPolicy">
-              <enum>QFormLayout::WrapAllRows</enum>
-             </property>
-             <property name="labelAlignment">
-              <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
-             </property>
-             <property name="formAlignment">
-              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-             </property>
-            </layout>
-           </item>
-          </layout>
+          <widget class="QPlainTextEdit" name="plainTextEdit_2">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>30</y>
+             <width>442</width>
+             <height>455</height>
+            </rect>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
          </widget>
         </item>
         <item>
@@ -226,22 +201,6 @@
   </connection>
   <connection>
    <sender>CodeGenFrame</sender>
-   <signal>templateTextReset(QString)</signal>
-   <receiver>template_edit</receiver>
-   <slot>setPlainText(QString)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>501</x>
-     <y>142</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>479</x>
-     <y>140</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>CodeGenFrame</sender>
    <signal>answerTextReset(QString)</signal>
    <receiver>plainTextEdit_2</receiver>
    <slot>setPlainText(QString)</slot>
@@ -251,24 +210,8 @@
      <y>329</y>
     </hint>
     <hint type="destinationlabel">
-     <x>473</x>
-     <y>378</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>template_edit</sender>
-   <signal>textChanged()</signal>
-   <receiver>CodeGenFrame</receiver>
-   <slot>update_for_template_change()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>431</x>
-     <y>79</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>502</x>
-     <y>75</y>
+     <x>947</x>
+     <y>379</y>
     </hint>
    </hints>
   </connection>
