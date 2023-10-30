@@ -1,8 +1,7 @@
 import os.path
-import time
 from typing import Callable
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 from langchain import prompts
 from transformers import AutoTokenizer
 
@@ -75,15 +74,6 @@ def read_weixin_article(browser: Browser) -> Article:
                    p if len(p) > len(section) else section)
 
 
-def read_info_q_articles(browser: Browser):
-    read_all_page_articles(browser, 'https://www.infoq.cn/article', read_info_q_article)
-    read_all_page_articles(browser, 'https://www.infoq.cn/news/', read_info_q_article)
-
-
-def read_wx_articles(browser: Browser):
-    read_all_page_articles(browser, 'https://mp.weixin.qq.com/s/', read_weixin_article)
-
-
 def read_all_page_articles(browser: Browser, article_url_prefix,
                            article_content_func: Callable[[Browser], Article]):
     tab_list = browser.all_tab_with_prefix(article_url_prefix)
@@ -102,12 +92,12 @@ def read_all_page_articles(browser: Browser, article_url_prefix,
         tab.close()
 
 
-def open_info_q_mail_urls(browser: Browser):
-    urls = {x.attributes['href'] for x in browser.search_elements('tag:a@href:https://etrack01')}
-    for u in urls:
-        browser.to_url_or_open(url=u, new_tab=True)
+def main():
+    browser = Browser()
+    read_all_page_articles(browser, 'https://mp.weixin.qq.com/s/', read_weixin_article)
+    read_all_page_articles(browser, 'https://www.infoq.cn/article', read_info_q_article)
+    read_all_page_articles(browser, 'https://www.infoq.cn/news/', read_info_q_article)
 
 
 if __name__ == '__main__':
-    read_wx_articles(Browser())
-    read_info_q_articles(Browser())
+    main()
