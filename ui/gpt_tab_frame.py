@@ -16,27 +16,6 @@ from gpt import gpt_util
 from gpt.prompt import parse_template
 
 
-class GptTabFrame(QFrame):
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-
-        from ui.gpt_tab_frame_uic import Ui_GptPageFrame
-        self.ui = Ui_GptPageFrame()
-        self.ui.setupUi(self)
-
-        self.browser = get_browser()
-        QShortcut('Ctrl+Shift+Backspace', self, self.clear_chat_history)
-        QShortcut(QKeySequence.StandardKey.AddTab, self, self.new_chat)
-
-    @Slot()
-    def new_chat(self):
-        gpt_util.start_new_chat(self.browser, True)
-
-    @Slot()
-    def clear_chat_history(self):
-        gpt_util.clear_chat_history(self.browser)
-
-
 def safe_parse_template(parent: QWidget, template: str) -> Optional[PromptTemplate]:
     try:
         return parse_template(template)
@@ -48,7 +27,7 @@ def safe_parse_template(parent: QWidget, template: str) -> Optional[PromptTempla
         return None
 
 
-class GptTabCodeGenFrame(QFrame):
+class GptTabFrame(QFrame):
     ROLE_IS_STATIC_ROW = Qt.ItemDataRole.UserRole + 1
     templateTextReset = Signal(str)
     statusLabelTextReset = Signal(str)
@@ -58,17 +37,22 @@ class GptTabCodeGenFrame(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        from ui.gpt_tab_code_gen_frame_uic import Ui_CodeGenFrame
-        self.ui = Ui_CodeGenFrame()
+        from ui.gpt_tab_frame_uic import Ui_GptTabFrame
+        self.ui = Ui_GptTabFrame()
         self.ui.setupUi(self)
 
         self.browser = get_browser()
         self.template_file = None
         self.init_prompt_inputs()
+        self.task_info_list = list()
+
+        QShortcut('Ctrl+Shift+Backspace', self, self.clear_chat_history)
+        QShortcut(QKeySequence.StandardKey.AddTab, self, self.new_chat)
         QShortcut("Ctrl+Return", self, self.generate_code)
         QShortcut(QKeySequence.StandardKey.Open, self, self.load_template_for_chat)
-        self.task_info_list = list()
         QShortcut(QKeySequence.StandardKey.Cancel, self, self.cancel_future)
+        QShortcut(QKeySequence.StandardKey.Save, self, self.save_template)
+        QShortcut(QKeySequence.StandardKey.Refresh, self, self.rename_template_file)
 
     def init_prompt_inputs(self):
         table = self.ui.prompt_input_table
@@ -91,6 +75,14 @@ class GptTabCodeGenFrame(QFrame):
             task.cancel()
             self.statusLabelTextReset.emit(f'{task.get_name()}被中断')
             task_info['cancelCallback']()
+
+    @Slot()
+    def new_chat(self):
+        gpt_util.start_new_chat(self.browser, True)
+
+    @Slot()
+    def clear_chat_history(self):
+        gpt_util.clear_chat_history(self.browser)
 
     @Slot()
     def load_template_for_chat(self):
@@ -150,7 +142,7 @@ class GptTabCodeGenFrame(QFrame):
 
     def static_row_count(self, table):
         return len([i for i in range(table.rowCount())
-                    if table.verticalHeaderItem(i).data(self.ROLE_IS_STATIC_ROW) == True])
+                    if table.verticalHeaderItem(i).data(self.ROLE_IS_STATIC_ROW) is True])
 
     @Slot()
     def generate_code(self):
@@ -201,100 +193,50 @@ class GptTabCodeGenFrame(QFrame):
         dialog = QFileDialog(self, '保存至', default_path, 'JSON Files(*.json')
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
 
-        def save_template_to_file(path: str):
+        def do_save(path: str):
             template = self.template_edit_widget.toPlainText()
             prompt = safe_parse_template(self, template)
             if not prompt:
                 return
             prompt.save(path)
+            self.template_file = path
+            self.ui.rename_template_btn.setEnabled(True)
+            self.statusLabelTextReset.emit(f'模板保存至: {path}')
 
-        dialog.fileSelected.connect(save_template_to_file)
-        dialog.open()
-
-
-class GptTemplateManagerFrame(QFrame):
-    templateTextReset = Signal(str)
-    tipUpdate = Signal(str)
-    curr_template_file: str
-
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-
-        from ui.gpt_tab_template_manager_frame_uic import Ui_TemplateMangerFrame
-        self.ui = Ui_TemplateMangerFrame()
-        self.ui.setupUi(self)
-        self.bind_keys()
-
-    def bind_keys(self):
-        QShortcut(QKeySequence.StandardKey.Open, self, self.load_template)
-        QShortcut(QKeySequence.StandardKey.Save, self, self.save_template)
-        QShortcut(QKeySequence.StandardKey.Refresh, self, self.rename_template_file)
-
-    @Slot()
-    def load_template(self):
-        dialog = QFileDialog(self, '打开模板文件', gpt_prompt_file_dir(), 'JSON Files(*.json)')
-        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
-        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        dialog.fileSelected.connect(self.load_template_file)
-        dialog.open()
-
-    def load_template_file(self, path):
-        prompt = load_prompt(path)
-        self.set_curr_template_file(path)
-        self.templateTextReset.emit(prompt.template)
-        self.tipUpdate.emit(f'加载文件: {path}')
-
-    def set_curr_template_file(self, path: str):
-        self.curr_template_file = path
-        self.ui.rename_file_button.setEnabled(True)
-
-    @Slot()
-    def save_template(self):
-        default_path = self.curr_template_file \
-            if self.curr_template_file else gpt_prompt_file_dir()
-        dialog = QFileDialog(self, '保存至', default_path, 'JSON Files(*.json')
-        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-
-        def save_template_to_file(path):
-            template = self.ui.plainTextEdit.toPlainText()
-            prompt = safe_parse_template(self, template)
-            if not prompt:
-                return
-            prompt.save(path)
-            self.set_curr_template_file(path)
-            self.tipUpdate.emit(f'模板保存至: {path}')
-
-        dialog.fileSelected.connect(save_template_to_file)
+        dialog.fileSelected.connect(do_save)
         dialog.open()
 
     @Slot()
     def rename_template_file(self):
-        file_path = self.curr_template_file
+        file_path = self.template_file
         if not file_path:
-            self.tipUpdate.emit('请先加载模板文件')
+            self.statusLabelTextReset.emit('请先加载模板文件')
             return
         if not os.path.exists(file_path):
-            self.tipUpdate.emit(f'文件已被删除: {file_path}')
+            self.statusLabelTextReset.emit(f'文件已被删除: {file_path}')
             return
-        self.load_template_file(file_path)
-        new_name, confirmed = QInputDialog.getText(self, '文件重命名', '新的文件名')
-        while confirmed:
+        self.load_template_for_chat(file_path)
+        while True:
+            new_name, confirmed = QInputDialog.getText(self, '模板文件重命名', '新的文件名')
+            if not confirmed:
+                return
             new_path = os.path.join(os.path.dirname(file_path), new_name)
-            if not os.path.exists(new_path):
-                if not new_path.endswith('.json'):
-                    new_path += '.json'
-                os.rename(file_path, new_path)
-                self.set_curr_template_file(new_path)
-                self.tipUpdate.emit(f'文件更名为: {new_path}')
-                break
+            if not new_path.endswith('.json'):
+                new_path += '.json'
+            if os.path.exists(new_path):
+                dialog = QMessageBox(QMessageBox.Icon.Critical, '重命名失败', f'{new_path}文件已存在')
+                dialog.open()
             else:
-                new_name, confirmed = QInputDialog.getText(self, '文件已存在', '新的文件名')
+                os.rename(file_path, new_path)
+                self.template_file = new_path
+                self.statusLabelTextReset.emit(f'文件更名为: {new_path}')
+                return
 
 
 if __name__ == '__main__':
     def main():
         app = QApplication()
-        frame = GptTabCodeGenFrame()
+        frame = GptTabFrame()
         frame.show()
         sys.exit(app.exec())
 
