@@ -24,22 +24,27 @@ def continue_ask(browser: Browser, ques: str):
     browser.search_elements('#prompt-textarea')[0].submit_input(ques)
 
 
-async def gen_code_question(browser: Browser, prompt: BasePromptTemplate, **kwargs: Any):
-    browser.find_and_switch(HOME_PAGE)
-    ask_as_new_chat(browser, prompt.format(**kwargs))
-
+async def _async_wait_answer_done(browser: Browser, before_ask_size=0):
     main_ele = None
     while not main_ele:
         main_ele = (await browser.async_search_elements('css:#__next main')).first()
     chats = []
     while (not chats
-           or len(chats) <
-           2 or not (await is_answer_finished(chats[-1]))):
+           or len(chats) < before_ask_size + 2
+           or not (await is_answer_finished(chats[-1]))):
         chats = await main_ele.async_search_elements('css: div.text-token-text-primary')
         await asyncio.sleep(1)
+    return chats
+
+
+async def gen_code_question(browser: Browser, prompt: BasePromptTemplate, **kwargs: Any):
+    browser.find_and_switch(HOME_PAGE)
+    ask_as_new_chat(browser, prompt.format(**kwargs))
+
+    chats = await _async_wait_answer_done(browser, 0)
     codes = (await chats[-1].async_search_elements('tag:code'))
     if codes:
-        text = ('\n'*2).join([BeautifulSoup(x.html, 'html.parser').get_text() for x in codes])
+        text = ('\n' * 2).join([BeautifulSoup(x.html, 'html.parser').get_text() for x in codes])
     else:
         text = BeautifulSoup(chats[-1].html, 'html.parser').get_text()
     code_text = text
@@ -90,16 +95,7 @@ def continue_ask_and_wait(browser: Browser, question: str):
 
 
 def _wait_answer_done(browser: Browser, before_ask_size=0):
-    messages = browser.search_elements('css:main div.text-token-text-primary')
-    while len(messages) < before_ask_size + 2:
-        time.sleep(0.1)
-    answer = browser.search_elements('css:main div.text-token-text-primary')[-1]
-    while not (answer.text
-               or not answer.search_elements('tag:p')
-               or any(x.pseudo_after != 'none' for x in answer.search_elements('tag:p'))
-               or any(x.pseudo_after != 'none' for x in answer.search_elements('tag:li'))):
-        answer = browser.search_elements('css:main div.text-token-text-primary')[-1]
-        time.sleep(0.1)
+    asyncio.get_event_loop().run_until_complete(_async_wait_answer_done(browser, before_ask_size))
 
 
 if __name__ == '__main__':

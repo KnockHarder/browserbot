@@ -2,6 +2,7 @@ import asyncio
 import time
 from typing import Callable, Optional, Iterator
 
+import requests
 from DrissionPage import ChromiumPage
 from DrissionPage.chromium_element import ChromiumElement
 from DrissionPage.commons.keys import Keys
@@ -11,11 +12,15 @@ FIND_INTERVAL = .5
 TIMEOUT = 5.
 
 
-class TabInfo:
-    def __init__(self, tab_id: str, url: str, title: str):
+class BrowserTab:
+    def __init__(self, web_tool_addr: str, tab_id: str, url: str, title: str):
+        self.address = web_tool_addr
         self.id = tab_id
         self.url = url
         self.title = title
+
+    def close(self):
+        requests.get(f'http://{self.address}/json/close/{self.id}')
 
 
 class TabNotFoundError(Exception):
@@ -225,22 +230,22 @@ class Browser:
         return self.session.get(f'http://{agent.address}/json').json()
 
     @property
-    def tabs(self) -> list[TabInfo]:
-        return [TabInfo(tab['id'], tab['url'], tab['title'])
+    def tabs(self) -> list[BrowserTab]:
+        return [BrowserTab(self.page.address, tab['id'], tab['url'], tab['title'])
                 for tab in filter(lambda x: x['type'] == 'page', self.__chrome_targets())]
 
     def switch_to_tab(self, tab_id):
         self.page.to_tab(tab_id)
 
-    def all_tab_with_prefix(self, url_prefix) -> list[TabInfo]:
+    def all_tab_with_prefix(self, url_prefix) -> list[BrowserTab]:
         return [x for x in self.tabs if x.url.startswith(url_prefix)]
 
-    def to_tab(self, tab: TabInfo = None, tab_id: str = None):
+    def to_tab(self, tab: BrowserTab = None, tab_id: str = None, activate=False):
         if tab:
             tab_id = tab.id
-        self.page.to_tab(tab_id)
+        self.page.to_tab(tab_id, activate)
 
-    def is_tab_alive(self, tab: TabInfo):
+    def is_tab_alive(self, tab: BrowserTab):
         return tab in [x.id for x in self.tabs]
 
     def to_url_or_open(self, url: str, new_tab=False, activate=False):
@@ -260,7 +265,7 @@ class Browser:
             self.page = page = ChromiumPage()
         page.new_tab(url, activate)
 
-    def find_tab_by_url_prefix(self, prefix: str) -> Optional[TabInfo]:
+    def find_tab_by_url_prefix(self, prefix: str) -> Optional[BrowserTab]:
         return max(filter(lambda x: x.url.startswith(prefix), self.tabs),
                    default=None, key=lambda y: len(y.url))
 

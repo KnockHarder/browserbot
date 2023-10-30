@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFrame, QWidget, QListWidgetItem
 import config as my_config
 import gpt.reader as gpt_reader
 from gpt.reader import Article
-from browser import Browser, TabInfo as BrowserTab
+from browser import Browser, BrowserTab as BrowserTab
 from mywidgets import MarkdownItemDelegate
 
 

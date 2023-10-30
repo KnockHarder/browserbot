@@ -2,7 +2,7 @@ import os.path
 import time
 from typing import Callable
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from langchain import prompts
 from transformers import AutoTokenizer
 
@@ -11,18 +11,17 @@ from browser import Browser, PageElement
 
 
 class Article:
-    def __init__(self, title: str, plain_content: str):
+    def __init__(self, title: str, plain_content: str, url: str = None):
         self.name = title
         self.content = plain_content
+        self.url = url
 
 
 def get_paragraphs_text(ele: PageElement, tag_name: str) -> str:
-    soup = BeautifulSoup(ele.html, 'html.parser')
-    paragraphs = soup.find_all(tag_name)
-    text = ''
-    for p in paragraphs:
-        text = text + p.get_text() + '\n'
-    return text
+    root_tag = BeautifulSoup(ele.html, 'html.parser')
+    paragraphs = root_tag.find_all(tag_name)
+    paragraphs = [x.get_text() for x in paragraphs if not x.find_all(tag_name)]
+    return '\n'.join(paragraphs)
 
 
 def token_size(text: str):
@@ -44,21 +43,23 @@ def summarize_article(browser: Browser, article: Article):
     end_content_prompt = prompts.load_prompt(os.path.join(template_dir, '文章阅读_endContent.json'))
 
     prompt_token_size = max([token_size(part_content_prompt.format(content='')),
-                             token_size(end_content_prompt.format(content=''))])
+                             token_size(end_content_prompt.format(caption='', url='', content=''))])
     token_limit = 4096 - prompt_token_size
     my_gpt.ask_as_new_chat_and_wait(browser, instruction_prompt.format(article_name=article.name))
     text_len_limit = int(len(article.content) / content_token * token_limit)
     text = ''
     for line in article.content.split('\n'):
         if len(line) > text_len_limit:
-            raise Exception('To long paragraph')
+            raise Exception('To long paragraph', f'{line[:20]}...{line[-20:]}')
         if len(text) + len(line) > 4096:
             my_gpt.continue_ask_and_wait(browser, part_content_prompt.format(content=text))
             text = line
         else:
             text = '\n'.join([text, line])
     if text:
-        my_gpt.continue_ask_and_wait(browser, end_content_prompt.format(content=text))
+        my_gpt.continue_ask_and_wait(browser,
+                                     end_content_prompt.format(
+                                         caption=article.name, url=article.url, content=text))
 
 
 def read_info_q_article(browser: Browser) -> Article:
@@ -93,13 +94,12 @@ def read_all_page_articles(browser: Browser, article_url_prefix,
         tab = tab_list.pop()
         browser.to_tab(tab)
         article = article_content_func(browser)
+        article.url = tab.url
         if not article.name or not article.content:
             print('No title or paragraph content', tab.url)
             continue
         summarize_article(browser, article)
-        if tab_list:
-            while browser.is_tab_alive(tab):
-                time.sleep(1)
+        tab.close()
 
 
 def open_info_q_mail_urls(browser: Browser):
@@ -110,3 +110,4 @@ def open_info_q_mail_urls(browser: Browser):
 
 if __name__ == '__main__':
     read_wx_articles(Browser())
+    read_info_q_articles(Browser())
