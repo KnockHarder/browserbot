@@ -8,9 +8,9 @@ import uuid
 from typing import Optional
 
 from PySide6.QtCore import Slot, Qt, QTimer
-from PySide6.QtGui import QShortcut
+from PySide6.QtGui import QShortcut, QAction
 from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QApplication, \
-    QTableWidgetItem
+    QTableWidgetItem, QMenu
 
 import url_manager_frame_rc
 from config import get_browser
@@ -106,7 +106,7 @@ class UrlManagerTabFrame(QFrame):
         table_frame: UrlTableFrame = tab_widget.widget(index)
         month_file = month_data_file_path()
         file_tabs = read_tab_data_from_file(month_file)
-        file_tabs = list(filter(lambda x: x['id'] != table_frame.id and x['tabName'] != tab_name, file_tabs))
+        file_tabs = list(filter(lambda x: x.get('id') != table_frame.id and x['tabName'] != tab_name, file_tabs))
         file_tabs.append({
             "id": table_frame.id,
             "tabName": tab_name,
@@ -168,6 +168,7 @@ class UrlManagerTabFrame(QFrame):
 
 class UrlTableFrame(QFrame):
     URL_DATA_ROLE = Qt.ItemDataRole.UserRole + 1
+    menu: QMenu
 
     def __init__(self, parent: Optional[QWidget] = None, table_id: str = None):
         super().__init__(parent)
@@ -189,6 +190,7 @@ class UrlTableFrame(QFrame):
         if not table_id:
             table_id = str(uuid.uuid1())
         self.id = table_id
+        self.init_menu()
 
     def init_row(self, row):
         table_widget = self.ui.tableWidget
@@ -302,6 +304,23 @@ class UrlTableFrame(QFrame):
 
         datas = [get_visual_row_data(i) for i in range(table_widget.rowCount())]
         return [x for x in datas if x]
+
+    def init_menu(self):
+        menu = self.menu = QMenu(self)
+        action = QAction('打开选中的所有链接', self)
+        action.triggered.connect(self.open_selected_urls)
+        menu.addAction(action)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        table_widget = self.ui.tableWidget
+        self.customContextMenuRequested.connect(lambda position: menu.exec(
+            table_widget.viewport().mapToGlobal(position)))
+
+    def open_selected_urls(self):
+        indexes = self.ui.tableWidget.selectedIndexes()
+        for idx in indexes:
+            url = self.get_row_bind_data(idx.row())['url']
+            if url:
+                self.browser.to_url_or_open(url, activate=False)
 
 
 class TableRowOperatorWidget(QWidget):

@@ -95,6 +95,7 @@ def read_all_page_articles(browser: Browser, article_url_prefix,
 def main():
     browser = Browser()
     read_all_page_articles(browser, 'https://mp.weixin.qq.com/s/', read_weixin_article)
+    read_all_page_articles(browser, 'https://mp.weixin.qq.com/s?', read_weixin_article)
     read_all_page_articles(browser, 'https://www.infoq.cn/article', read_info_q_article)
     read_all_page_articles(browser, 'https://www.infoq.cn/news/', read_info_q_article)
 
