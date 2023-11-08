@@ -75,9 +75,11 @@ class JsonViewerFrame(QFrame):
         text = QApplication.clipboard().text()
         try:
             self.data = json.loads(text)
-        except JSONDecodeError:
-            box = QMessageBox(QMessageBox.Icon.Critical, 'Error', 'Invalid JSON',
+        except JSONDecodeError as e:
+            box = QMessageBox(QMessageBox.Icon.Critical, 'Error', e.msg,
                               QMessageBox.StandardButton.Close, self)
+            box.setDetailedText(f'Line: {e.lineno}/{len(text.splitlines())}\n'
+                                f'{text[max(0, e.pos - 10):min(e.pos + 10, len(text))]}')
             box.setWindowModality(Qt.WindowModality.WindowModal)
             box.show()
             return
