@@ -126,6 +126,7 @@ class UrlManagerTabFrame(QFrame):
             tab_widget.setTabText(index, name)
 
         dialog.textValueSelected.connect(rename_tab_to)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
         dialog.show()
 
     def save_to_json(self):
