@@ -27,11 +27,25 @@
     <number>0</number>
    </property>
    <item>
-    <widget class="QPushButton" name="pushButton">
-     <property name="text">
-      <string>粘贴JSON</string>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <property name="topMargin">
+      <number>0</number>
      </property>
-    </widget>
+     <item>
+      <widget class="QPushButton" name="pushButton">
+       <property name="text">
+        <string>粘贴JSON</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_2">
+       <property name="text">
+        <string>shell命令获取JSON</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item>
     <layout class="QFormLayout" name="formLayout">
@@ -85,22 +99,6 @@
  <resources/>
  <connections>
   <connection>
-   <sender>pushButton</sender>
-   <signal>clicked()</signal>
-   <receiver>json_viewer_frame</receiver>
-   <slot>import_from_paste()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>133</x>
-     <y>24</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>72</x>
-     <y>-74</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>json_path_edit_widget</sender>
    <signal>textEdited(QString)</signal>
    <receiver>json_viewer_frame</receiver>
@@ -148,11 +146,44 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>json_viewer_frame</receiver>
+   <slot>import_from_paste()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>133</x>
+     <y>24</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>72</x>
+     <y>-74</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_2</sender>
+   <signal>clicked()</signal>
+   <receiver>json_viewer_frame</receiver>
+   <slot>import_from_shell()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>414</x>
+     <y>20</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>409</x>
+     <y>-18</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <signal>jsonPathChanged(QString)</signal>
   <slot>import_from_paste()</slot>
   <slot>search_json(QString)</slot>
   <slot>go_json_path(QString)</slot>
+  <slot>import_from_shell()</slot>
  </slots>
 </ui>

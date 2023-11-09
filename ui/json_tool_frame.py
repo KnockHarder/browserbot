@@ -1,12 +1,26 @@
+import asyncio
 import json
+import subprocess
 import sys
+from asyncio import Task
 from json import JSONDecodeError
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Callable
 
 import jsonpath
 from PySide6.QtCore import Slot, Signal, Qt, QPoint
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QTreeWidget, QMenu, \
-    QInputDialog, QLineEdit
+    QInputDialog, QLineEdit, QPushButton
+
+
+class CancelableTask:
+    def __init__(self, task: Task, cancel_callback: Callable[[], None]):
+        self.task = task
+        self.cancel_callback = cancel_callback
+
+    def cancel(self):
+        self.task.cancel()
+        self.cancel_callback()
 
 
 class JsonViewerFrame(QFrame):
@@ -26,6 +40,14 @@ class JsonViewerFrame(QFrame):
         widget = self.ui.json_tree_widget
         widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         widget.customContextMenuRequested.connect(self.popup_item_menu)
+
+        self.task_info_list = list[CancelableTask]()
+
+        def _cancel_task():
+            while self.task_info_list:
+                self.task_info_list.pop().cancel()
+
+        QShortcut(QKeySequence.StandardKey.Cancel, self, _cancel_task)
 
     def refresh_json_tree(self):
         self.update_json_tree(self.data)
@@ -75,6 +97,7 @@ class JsonViewerFrame(QFrame):
         text = QApplication.clipboard().text()
         try:
             self.data = json.loads(text)
+            self.refresh_json_tree()
         except JSONDecodeError as e:
             box = QMessageBox(QMessageBox.Icon.Critical, 'Error', e.msg,
                               QMessageBox.StandardButton.Close, self)
@@ -82,8 +105,6 @@ class JsonViewerFrame(QFrame):
                                 f'{text[max(0, e.pos - 10):min(e.pos + 10, len(text))]}')
             box.setWindowModality(Qt.WindowModality.WindowModal)
             box.show()
-            return
-        self.refresh_json_tree()
 
     @Slot(str)
     def search_json(self, key: str):
@@ -151,6 +172,47 @@ class JsonViewerFrame(QFrame):
             box.show()
             return
         self.update_json_tree(data[0], json_path)
+
+    @Slot()
+    def import_from_shell(self):
+        dialog = QInputDialog(self)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        command, confirmed = dialog.getMultiLineText(dialog.parent(), '执行shell命令', 'command')
+        if not confirmed:
+            return
+        popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        self.set_import_enable(False)
+
+        async def _async_import_from_shell():
+            while popen.poll() is None:
+                await asyncio.sleep(1)
+            out, err = popen.communicate()
+            output = str(out, encoding='utf-8')
+            if err or not output:
+                box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '无输出内容',
+                                  QMessageBox.StandardButton.Close, self)
+                box.setDetailedText(f'Code: {err}')
+                box.setWindowModality(Qt.WindowModality.WindowModal)
+                box.show()
+                return
+            try:
+                self.data = json.loads(output)
+                self.refresh_json_tree()
+            except JSONDecodeError:
+                box = QMessageBox(QMessageBox.Icon.Critical, 'Error', '非JSON格式输出',
+                                  QMessageBox.StandardButton.Close, self)
+                box.setDetailedText(output[0: min(20, len(output))])
+                box.setWindowModality(Qt.WindowModality.WindowModal)
+                box.show()
+            self.set_import_enable(True)
+
+        task = asyncio.create_task(_async_import_from_shell(), name='import_from_shell')
+        self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))
+
+    def set_import_enable(self, enable):
+        for child in self.children():
+            if isinstance(child, QPushButton) and 'JSON' in child.text():
+                child.setEnabled(enable)
 
 
 def main():
