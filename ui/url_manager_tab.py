@@ -308,9 +308,7 @@ class UrlTableFrame(QFrame):
 
     def init_menu(self):
         menu = self.menu = QMenu(self)
-        action = QAction('打开选中的所有链接', self)
-        action.triggered.connect(self.open_selected_urls)
-        menu.addAction(action)
+        menu.addAction('Open Links Selected').triggered.connect(self.open_selected_urls)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         table_widget = self.ui.tableWidget
         self.customContextMenuRequested.connect(lambda position: menu.exec(

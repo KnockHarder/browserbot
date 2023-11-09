@@ -37,17 +37,10 @@ class JsonViewerFrame(QFrame):
 
         self.data = {}
         self.refresh_json_tree()
-        widget = self.ui.json_tree_widget
-        widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        widget.customContextMenuRequested.connect(self.popup_item_menu)
+        self.init_menu()
 
         self.task_info_list = list[CancelableTask]()
-
-        def _cancel_task():
-            while self.task_info_list:
-                self.task_info_list.pop().cancel()
-
-        QShortcut(QKeySequence.StandardKey.Cancel, self, _cancel_task)
+        self.init_task_cancel_shortcut()
 
     def refresh_json_tree(self):
         self.update_json_tree(self.data)
@@ -92,6 +85,37 @@ class JsonViewerFrame(QFrame):
                 else:
                     item.setExpanded(True)
 
+    def init_menu(self):
+        def _popup_item_menu(pos: QPoint):
+            item = widget.itemAt(pos)
+            if not item:
+                return
+            menu = QMenu()
+            menu.addAction('Focus').triggered.connect(lambda: self.focus_item(item))
+            menu.addAction('Show Descendants').triggered.connect(lambda: self.show_and_expand_recursively(item))
+            menu.addAction('Go path').triggered.connect(lambda: self.input_and_go_json_path(item))
+            menu.addAction('Copy Key').triggered.connect(lambda: QApplication.clipboard().setText(item.text(0)))
+            menu.addAction("Copy Value").triggered.connect(lambda: QApplication.clipboard().setText(item.setText(1)))
+            menu.exec(widget.mapToGlobal(pos))
+            menu.deleteLater()
+
+        widget = self.ui.json_tree_widget
+        widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        widget.customContextMenuRequested.connect(_popup_item_menu)
+
+    def init_task_cancel_shortcut(self):
+        def _cancel_task():
+            while self.task_info_list:
+                self.task_info_list.pop().cancel()
+
+        QShortcut(QKeySequence.StandardKey.Cancel, self, _cancel_task)
+
+    def show_and_expand_recursively(self, item: QTreeWidgetItem):
+        item.setExpanded(True)
+        item.setHidden(False)
+        for i in range(item.childCount()):
+            self.show_and_expand_recursively(item.child(i))
+
     @Slot()
     def import_from_paste(self):
         text = QApplication.clipboard().text()
@@ -126,20 +150,6 @@ class JsonViewerFrame(QFrame):
             return not any_match
         else:
             return False
-
-    @Slot()
-    def popup_item_menu(self, pos: QPoint):
-        json_tree_widget = self.ui.json_tree_widget
-        item = json_tree_widget.itemAt(pos)
-        if not item:
-            return
-
-        menu = QMenu()
-        action = menu.addAction('Focus')
-        action.triggered.connect(lambda: self.focus_item(item))
-        action = menu.addAction('Go path')
-        action.triggered.connect(lambda: self.input_and_go_json_path(item))
-        menu.exec(json_tree_widget.mapToGlobal(pos))
 
     def focus_item(self, item: QTreeWidgetItem):
         json_path = item.data(0, self.JSON_PATH_ROLE)
