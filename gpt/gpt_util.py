@@ -12,7 +12,8 @@ HOME_PAGE = 'https://chat.openai.com'
 
 def start_new_chat(browser: Browser, activate=False):
     browser.find_and_switch(HOME_PAGE, activate)
-    browser.search_elements('tag:a@@text()=New Chat')[0].click()
+    browser.search_elements('tag:span')(
+        'tag:button@class:text-token-text-primary')[-1].click()
 
 
 def ask_as_new_chat(browser: Browser, ques: str):
@@ -70,17 +71,22 @@ def is_element_finished(element: PageElement):
 def clear_chat_history(browser: Browser):
     browser.find_and_switch(HOME_PAGE)
     end = time.perf_counter() + 5
-    chat_list = browser.search_elements(
-        'tag:h2@text()=Chat history', end - time.perf_counter()
-    ).search_after_siblings_nodes(
-        'tag:nav', end - time.perf_counter()
-    )[0].search_elements('tag:li', end - time.perf_counter())
+
+    def _remain_time():
+        return end - time.perf_counter()
+
+    history_area = browser.search_elements(
+        'tag:h3', _remain_time()).first().parent.parent
+    chat_list = history_area.search_elements('tag:li', _remain_time())
     if not chat_list:
         raise ElementNotFoundError('NoChat')
     for chat in chat_list:
-        chat.search_elements('tag:a')[0].click()
-        chat.search_elements('tag:button')[1].click()
-        browser.search_elements('tag:button@text()=Delete')[0].click()
+        chat.click()
+        history_area.search_elements('tag:button', _remain_time()).first().click()
+        browser.search_elements('tag:div@@role=menuitem@@text()=Delete chat', _remain_time()).first(
+        ).click()
+        browser.search_elements('tag:div@class:absolute', _remain_time())(
+            'tag:button@text()=Delete', _remain_time()).first().click()
 
 
 def ask_as_new_chat_and_wait(browser: Browser, question: str):
@@ -99,4 +105,4 @@ def _wait_answer_done(browser: Browser, before_ask_size=0):
 
 
 if __name__ == '__main__':
-    ask_as_new_chat_and_wait(Browser(), '最近有什么科技新闻吗？')
+    clear_chat_history(Browser())

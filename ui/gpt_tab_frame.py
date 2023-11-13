@@ -116,7 +116,9 @@ class GptTabFrame(QFrame):
         start_row = self.static_row_count(table)
         variables = sorted(prompt.input_variables, key=lambda x: template.index(x))
         for idx, variable in enumerate(variables):
-            row = next(filter(lambda x: table.verticalHeaderItem(x).text() == variable, range(table.rowCount())))
+            row = next(filter(lambda x: table.verticalHeaderItem(x).text() == variable,
+                              range(table.rowCount())),
+                       None)
             if not row:
                 row = start_row + idx
                 table.insertRow(row)

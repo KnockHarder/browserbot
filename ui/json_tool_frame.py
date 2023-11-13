@@ -2,6 +2,7 @@ import asyncio
 import json
 import subprocess
 import sys
+import tempfile
 from asyncio import Task
 from json import JSONDecodeError
 from typing import Optional, Union, Any, Callable
@@ -190,18 +191,22 @@ class JsonViewerFrame(QFrame):
         command, confirmed = dialog.getMultiLineText(dialog.parent(), '执行shell命令', 'command')
         if not confirmed:
             return
-        popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        out_file = tempfile.TemporaryFile()
+        popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
         self.set_import_enable(False)
 
         async def _async_import_from_shell():
             while popen.poll() is None:
                 await asyncio.sleep(1)
-            out, err = popen.communicate()
-            output = str(out, encoding='utf-8')
-            if err or not output:
+            out_file.seek(0)
+            _update_json_by_output(str(out_file.read(), 'utf-8'))
+            self.set_import_enable(True)
+
+        def _update_json_by_output(output: str):
+            if not output:
                 box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '无输出内容',
                                   QMessageBox.StandardButton.Close, self)
-                box.setDetailedText(f'Code: {err}')
+                box.setDetailedText(f'Code: {popen.poll()}')
                 box.setWindowModality(Qt.WindowModality.WindowModal)
                 box.show()
                 return
@@ -214,7 +219,6 @@ class JsonViewerFrame(QFrame):
                 box.setDetailedText(output[0: min(20, len(output))])
                 box.setWindowModality(Qt.WindowModality.WindowModal)
                 box.show()
-            self.set_import_enable(True)
 
         task = asyncio.create_task(_async_import_from_shell(), name='import_from_shell')
         self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))

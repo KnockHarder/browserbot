@@ -105,7 +105,7 @@ class UrlManagerTabFrame(QFrame):
         tab_name = tab_widget.tabText(index)
         table_frame: UrlTableFrame = tab_widget.widget(index)
         month_file = month_data_file_path()
-        file_tabs = read_tab_data_from_file(month_file)
+        file_tabs = read_tab_data_from_file(month_file) if os.path.exists(month_file) else []
         file_tabs = list(filter(lambda x: x.get('id') != table_frame.id and x['tabName'] != tab_name, file_tabs))
         file_tabs.append({
             "id": table_frame.id,
@@ -186,6 +186,7 @@ class UrlTableFrame(QFrame):
             lambda _, b, e: [self.init_row(i) for i in range(b, e + 1)])
         table_widget.cellDoubleClicked.connect(self.go_cell_url)
         table_widget.cellChanged.connect(self.update_cell_data)
+        table_widget.cellChanged.connect(lambda _, __: table_widget.resizeColumnToContents(0))
 
         self.browser = get_browser()
         if not table_id:
