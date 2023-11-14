@@ -43,8 +43,10 @@ class JsonViewerFrame(QFrame):
         self.task_info_list = list[CancelableTask]()
         self.init_task_cancel_shortcut()
 
-    def refresh_json_tree(self):
+    def refresh_json_tree(self, json_path='$'):
         self.update_json_tree(self.data)
+        if json_path:
+            self.jsonPathChanged.emit(json_path)
 
     def update_json_tree(self, data: Union[dict, list, Any], json_path='$'):
         tree_widget = self.ui.json_tree_widget
@@ -87,6 +89,13 @@ class JsonViewerFrame(QFrame):
                     item.setExpanded(True)
 
     def init_menu(self):
+        def _copy_to_clipboard(content):
+            if isinstance(content, list) or isinstance(content, dict):
+                content = json.dumps(content, indent=2, ensure_ascii=False)
+            else:
+                content = str(content)
+            QApplication.clipboard().setText(content)
+
         def _popup_item_menu(pos: QPoint):
             item = widget.itemAt(pos)
             if not item:
@@ -95,8 +104,10 @@ class JsonViewerFrame(QFrame):
             menu.addAction('Focus').triggered.connect(lambda: self.focus_item(item))
             menu.addAction('Show Descendants').triggered.connect(lambda: self.show_and_expand_recursively(item))
             menu.addAction('Go path').triggered.connect(lambda: self.input_and_go_json_path(item))
-            menu.addAction('Copy Key').triggered.connect(lambda: QApplication.clipboard().setText(item.text(0)))
-            menu.addAction("Copy Value").triggered.connect(lambda: QApplication.clipboard().setText(item.setText(1)))
+            menu.addAction('Copy Key').triggered.connect(lambda: _copy_to_clipboard(item.text(0)))
+            menu.addAction("Copy Value").triggered.connect(lambda: _copy_to_clipboard(item.text(1)))
+            menu.addAction("Copy JSON Value").triggered.connect(lambda: _copy_to_clipboard(
+                jsonpath.jsonpath(self.data, item.data(0, self.JSON_PATH_ROLE))[0]))
             menu.exec(widget.mapToGlobal(pos))
             menu.deleteLater()
 
@@ -122,7 +133,7 @@ class JsonViewerFrame(QFrame):
         text = QApplication.clipboard().text()
         try:
             self.data = json.loads(text)
-            self.refresh_json_tree()
+            self.refresh_json_tree(self.ui.json_path_edit_widget.text())
         except JSONDecodeError as e:
             box = QMessageBox(QMessageBox.Icon.Critical, 'Error', e.msg,
                               QMessageBox.StandardButton.Close, self)
@@ -174,15 +185,21 @@ class JsonViewerFrame(QFrame):
         if confirmed:
             self.go_json_path(json_path)
 
+    @Slot(str)
     def go_json_path(self, json_path: str):
+        edit_widget = self.ui.json_path_edit_widget
         data = jsonpath.jsonpath(self.data, json_path)
-        if not data:
-            box = QMessageBox(QMessageBox.Icon.Critical, 'Error', 'JSON Path无有效数据',
-                              QMessageBox.StandardButton.Close, self.ui.json_tree_widget)
-            box.setWindowModality(Qt.WindowModality.WindowModal)
-            box.show()
+        if data:
+            self.update_json_tree(data[0], json_path)
+            edit_widget.setStyleSheet('')
             return
-        self.update_json_tree(data[0], json_path)
+        if json_path == edit_widget.text():
+            edit_widget.setStyleSheet('background-color:pink;')
+            return
+        box = QMessageBox(QMessageBox.Icon.Critical, 'Error', 'JSON Path无有效数据',
+                          QMessageBox.StandardButton.Close, self.ui.json_tree_widget)
+        box.setWindowModality(Qt.WindowModality.WindowModal)
+        box.show()
 
     @Slot()
     def import_from_shell(self):
