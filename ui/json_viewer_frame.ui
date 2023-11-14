@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>JsonViewerFrame</class>
+ <widget class="QFrame" name="JsonViewerFrame">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Frame</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <layout class="QFormLayout" name="formLayout">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetNoConstraint</enum>
+     </property>
+     <property name="fieldGrowthPolicy">
+      <enum>QFormLayout::ExpandingFieldsGrow</enum>
+     </property>
+     <property name="formAlignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+     <item row="0" column="0">
+      <widget class="QLabel" name="json_path_label_widget">
+       <property name="text">
+        <string>JSON Path</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QLineEdit" name="json_path_edit_widget"/>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="search_label_widget">
+       <property name="text">
+        <string>搜索</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QLineEdit" name="search_text_edit_widget"/>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTreeWidget" name="json_tree_widget">
+     <column>
+      <property name="text">
+       <string notr="true">key</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>value</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>search_text_edit_widget</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>JsonViewerFrame</receiver>
+   <slot>search_json(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>145</x>
+     <y>38</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>534</x>
+     <y>-26</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>json_path_edit_widget</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>JsonViewerFrame</receiver>
+   <slot>search_json(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>107</x>
+     <y>12</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>110</x>
+     <y>-13</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>JsonViewerFrame</sender>
+   <signal>jsonPathChanged(QString)</signal>
+   <receiver>json_path_edit_widget</receiver>
+   <slot>setText(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>24</x>
+     <y>32</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>84</x>
+     <y>16</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <signal>jsonPathChanged(QString)</signal>
+  <slot>search_json(QString)</slot>
+  <slot>go_json_path(QString)</slot>
+ </slots>
+</ui>

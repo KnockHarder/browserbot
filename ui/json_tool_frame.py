@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import subprocess
 import sys
@@ -24,24 +25,114 @@ class CancelableTask:
         self.cancel_callback()
 
 
+class JsonToolFrame(QFrame):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        from ui.json_tool_frame_uic import Ui_JsonToolFrame
+        self.ui = Ui_JsonToolFrame()
+        self.ui.setupUi(self)
+
+        self.ui.tabWidget.tabBarDoubleClicked.connect(self.rename_tab)
+        self.task_info_list = list[CancelableTask]()
+        self.init_task_cancel_shortcut()
+
+    def rename_tab(self, index: int):
+        def _rename(name: str):
+            if not name:
+                return
+            self.ui.tabWidget.setTabText(index, name)
+
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle('更改标签名')
+        dialog.setLabelText('新名称')
+        dialog.textValueSelected.connect(_rename)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.show()
+
+    def init_task_cancel_shortcut(self):
+        def _cancel_task():
+            while self.task_info_list:
+                self.task_info_list.pop().cancel()
+
+        QShortcut(QKeySequence.StandardKey.Cancel, self, _cancel_task)
+
+    @Slot()
+    def import_from_paste(self):
+        text = QApplication.clipboard().text()
+        try:
+            data = json.loads(text)
+            self.import_json(data)
+        except JSONDecodeError as e:
+            box = QMessageBox(QMessageBox.Icon.Critical, 'Error', e.msg,
+                              QMessageBox.StandardButton.Close, self)
+            box.setDetailedText(f'Line: {e.lineno}/{len(text.splitlines())}\n'
+                                f'{text[max(0, e.pos - 10):min(e.pos + 10, len(text))]}')
+            box.setWindowModality(Qt.WindowModality.WindowModal)
+            box.show()
+
+    def import_json(self, data):
+        tab_widget = self.ui.tabWidget
+        now = datetime.datetime.now()
+        tab_widget.addTab(JsonViewerFrame(data, tab_widget), f'{now.hour}:{now.minute}')
+
+    @Slot()
+    def import_from_shell(self):
+        dialog = QInputDialog(self)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        command, confirmed = dialog.getMultiLineText(dialog.parent(), '执行shell命令', 'command')
+        if not confirmed:
+            return
+        out_file = tempfile.TemporaryFile()
+        popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
+        self.set_import_enable(False)
+
+        async def _async_import_from_shell():
+            while popen.poll() is None:
+                await asyncio.sleep(1)
+            out_file.seek(0)
+            _update_json_by_output(str(out_file.read(), 'utf-8'))
+            self.set_import_enable(True)
+
+        def _update_json_by_output(output: str):
+            if not output:
+                box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '无输出内容',
+                                  QMessageBox.StandardButton.Close, self)
+                box.setDetailedText(f'Code: {popen.poll()}')
+                box.setWindowModality(Qt.WindowModality.WindowModal)
+                box.show()
+                return
+            try:
+                self.import_json(json.loads(output))
+            except JSONDecodeError:
+                box = QMessageBox(QMessageBox.Icon.Critical, 'Error', '非JSON格式输出',
+                                  QMessageBox.StandardButton.Close, self)
+                box.setDetailedText(output[0: min(20, len(output))])
+                box.setWindowModality(Qt.WindowModality.WindowModal)
+                box.show()
+
+        task = asyncio.create_task(_async_import_from_shell(), name='import_from_shell')
+        self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))
+
+    def set_import_enable(self, enable):
+        for child in self.children():
+            if isinstance(child, QPushButton) and 'JSON' in child.text():
+                child.setEnabled(enable)
+
+
 class JsonViewerFrame(QFrame):
     JSON_VALUE_COLUMN = 1
     JSON_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
     jsonPathChanged = Signal(str)
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, data: Union[dict, list, Any], parent: Optional[QWidget] = None):
         super().__init__(parent)
-
-        from ui.json_tool_frame_uic import Ui_json_viewer_frame
-        self.ui = Ui_json_viewer_frame()
+        self.data = data
+        from ui.json_viewer_frame_uic import Ui_JsonViewerFrame
+        self.ui = Ui_JsonViewerFrame()
         self.ui.setupUi(self)
-
-        self.data = {}
         self.refresh_json_tree()
         self.init_menu()
-
-        self.task_info_list = list[CancelableTask]()
-        self.init_task_cancel_shortcut()
 
     def refresh_json_tree(self, json_path='$'):
         self.update_json_tree(self.data)
@@ -107,7 +198,7 @@ class JsonViewerFrame(QFrame):
             menu.addAction('Copy Key').triggered.connect(lambda: _copy_to_clipboard(item.text(0)))
             menu.addAction("Copy Value").triggered.connect(lambda: _copy_to_clipboard(item.text(1)))
             menu.addAction("Copy JSON Value").triggered.connect(lambda: _copy_to_clipboard(
-                jsonpath.jsonpath(self.data, item.data(0, self.JSON_PATH_ROLE))[0]))
+                self._item_json_value(item)))
             menu.exec(widget.mapToGlobal(pos))
             menu.deleteLater()
 
@@ -115,32 +206,14 @@ class JsonViewerFrame(QFrame):
         widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         widget.customContextMenuRequested.connect(_popup_item_menu)
 
-    def init_task_cancel_shortcut(self):
-        def _cancel_task():
-            while self.task_info_list:
-                self.task_info_list.pop().cancel()
-
-        QShortcut(QKeySequence.StandardKey.Cancel, self, _cancel_task)
+    def _item_json_value(self, item: QTreeWidgetItem):
+        return jsonpath.jsonpath(self.data, item.data(0, self.JSON_PATH_ROLE))[0]
 
     def show_and_expand_recursively(self, item: QTreeWidgetItem):
         item.setExpanded(True)
         item.setHidden(False)
         for i in range(item.childCount()):
             self.show_and_expand_recursively(item.child(i))
-
-    @Slot()
-    def import_from_paste(self):
-        text = QApplication.clipboard().text()
-        try:
-            self.data = json.loads(text)
-            self.refresh_json_tree(self.ui.json_path_edit_widget.text())
-        except JSONDecodeError as e:
-            box = QMessageBox(QMessageBox.Icon.Critical, 'Error', e.msg,
-                              QMessageBox.StandardButton.Close, self)
-            box.setDetailedText(f'Line: {e.lineno}/{len(text.splitlines())}\n'
-                                f'{text[max(0, e.pos - 10):min(e.pos + 10, len(text))]}')
-            box.setWindowModality(Qt.WindowModality.WindowModal)
-            box.show()
 
     @Slot(str)
     def search_json(self, key: str):
@@ -189,8 +262,9 @@ class JsonViewerFrame(QFrame):
     def go_json_path(self, json_path: str):
         edit_widget = self.ui.json_path_edit_widget
         data = jsonpath.jsonpath(self.data, json_path)
+        data = data[0] if len(data) == 1 else data
         if data:
-            self.update_json_tree(data[0], json_path)
+            self.update_json_tree(data, json_path)
             edit_widget.setStyleSheet('')
             return
         if json_path == edit_widget.text():
@@ -201,54 +275,10 @@ class JsonViewerFrame(QFrame):
         box.setWindowModality(Qt.WindowModality.WindowModal)
         box.show()
 
-    @Slot()
-    def import_from_shell(self):
-        dialog = QInputDialog(self)
-        dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        command, confirmed = dialog.getMultiLineText(dialog.parent(), '执行shell命令', 'command')
-        if not confirmed:
-            return
-        out_file = tempfile.TemporaryFile()
-        popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
-        self.set_import_enable(False)
-
-        async def _async_import_from_shell():
-            while popen.poll() is None:
-                await asyncio.sleep(1)
-            out_file.seek(0)
-            _update_json_by_output(str(out_file.read(), 'utf-8'))
-            self.set_import_enable(True)
-
-        def _update_json_by_output(output: str):
-            if not output:
-                box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '无输出内容',
-                                  QMessageBox.StandardButton.Close, self)
-                box.setDetailedText(f'Code: {popen.poll()}')
-                box.setWindowModality(Qt.WindowModality.WindowModal)
-                box.show()
-                return
-            try:
-                self.data = json.loads(output)
-                self.refresh_json_tree()
-            except JSONDecodeError:
-                box = QMessageBox(QMessageBox.Icon.Critical, 'Error', '非JSON格式输出',
-                                  QMessageBox.StandardButton.Close, self)
-                box.setDetailedText(output[0: min(20, len(output))])
-                box.setWindowModality(Qt.WindowModality.WindowModal)
-                box.show()
-
-        task = asyncio.create_task(_async_import_from_shell(), name='import_from_shell')
-        self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))
-
-    def set_import_enable(self, enable):
-        for child in self.children():
-            if isinstance(child, QPushButton) and 'JSON' in child.text():
-                child.setEnabled(enable)
-
 
 def main():
     app = QApplication()
-    frame = JsonViewerFrame()
+    frame = JsonToolFrame()
     frame.show()
     sys.exit(app.exec())
 

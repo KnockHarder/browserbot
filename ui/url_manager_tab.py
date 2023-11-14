@@ -8,7 +8,7 @@ import uuid
 from typing import Optional
 
 from PySide6.QtCore import Slot, Qt, QTimer
-from PySide6.QtGui import QShortcut, QAction
+from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QApplication, \
     QTableWidgetItem, QMenu
 
