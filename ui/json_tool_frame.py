@@ -33,7 +33,9 @@ class JsonToolFrame(QFrame):
         self.ui = Ui_JsonToolFrame()
         self.ui.setupUi(self)
 
-        self.ui.tabWidget.tabBarDoubleClicked.connect(self.rename_tab)
+        tab_widget = self.ui.tabWidget
+        tab_widget.tabBarDoubleClicked.connect(self.rename_tab)
+        tab_widget.tabCloseRequested.connect(lambda idx: tab_widget.removeTab(idx))
         self.task_info_list = list[CancelableTask]()
         self.init_task_cancel_shortcut()
 
@@ -46,6 +48,7 @@ class JsonToolFrame(QFrame):
         dialog = QInputDialog(self)
         dialog.setWindowTitle('更改标签名')
         dialog.setLabelText('新名称')
+        dialog.setTextValue(self.ui.tabWidget.tabText(index))
         dialog.textValueSelected.connect(_rename)
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         dialog.show()
@@ -71,10 +74,12 @@ class JsonToolFrame(QFrame):
             box.setWindowModality(Qt.WindowModality.WindowModal)
             box.show()
 
-    def import_json(self, data):
+    def import_json(self, data: Union[dict, list, Any], tab_name: str = None):
         tab_widget = self.ui.tabWidget
-        now = datetime.datetime.now()
-        tab_widget.addTab(JsonViewerFrame(data, tab_widget), f'{now.hour}:{now.minute}')
+        if not tab_name:
+            now = datetime.datetime.now()
+            tab_name = f'{now.hour}:{now.minute}'
+        tab_widget.addTab(JsonViewerFrame(data, tab_widget), tab_name)
 
     @Slot()
     def import_from_shell(self):

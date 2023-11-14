@@ -121,6 +121,7 @@ class UrlManagerTabFrame(QFrame):
 
         dialog = QInputDialog(self)
         dialog.setLabelText('新的标签名')
+        dialog.setTextValue(tab_widget.tabText(index))
 
         def rename_tab_to(name: str):
             tab_widget.setTabText(index, name)
