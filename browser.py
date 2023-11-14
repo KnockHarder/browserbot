@@ -59,7 +59,10 @@ class PageElement:
 
     @property
     def parent(self) -> "PageElement":
-        return PageElement(self.element.parent(), f'{self.loc_desc}-> parent')
+        element = PageElement(self.element.parent(), f'{self.loc_desc}-> parent')
+        if not element:
+            raise ElementNotFoundError(f'{self.loc_desc}-> parent')
+        return element
 
     @property
     def attributes(self):
@@ -81,7 +84,7 @@ class PageElement:
     def child_at(self, idx: int) -> "PageElement":
         children = self.element.children()
         loc_desc = f'{self.loc_desc}-> childAt[{idx}]'
-        if idx < 0 or idx >= len(children):
+        if idx < -len(children) or idx >= len(children):
             raise ElementNotFoundError(loc_desc)
         return PageElement(children[idx], loc_desc)
 
@@ -229,10 +232,26 @@ class Browser:
         agent = self.page
         return self.session.get(f'http://{agent.address}/json').json()
 
+    def __close_target(self, target_id):
+        address = self.page.address
+        self.session.get(f'http://{address}/json/close/{target_id}')
+
     @property
     def tabs(self) -> list[BrowserTab]:
         return [BrowserTab(self.page.address, tab['id'], tab['url'], tab['title'])
                 for tab in filter(lambda x: x['type'] == 'page', self.__chrome_targets())]
+
+    @property
+    def current_tab(self) -> BrowserTab:
+        tab_id = self.page.driver.id
+        tabs = self.tabs
+        if not tabs:
+            raise TabNotFoundError('No tab')
+        curr = next(filter(lambda x: x.id == tab_id, tabs), None)
+        if curr:
+            return curr
+        self.page.to_tab(tabs[0].id)
+        return curr
 
     def switch_to_tab(self, tab_id):
         self.page.to_tab(tab_id)
@@ -256,14 +275,14 @@ class Browser:
                 page.to_tab(tab.id, activate)
                 return
         if page.is_alive:
-            page.new_tab(url, activate)
+            self.open_as_new_tab(url, activate)
             return
         tabs = self.tabs
         if tabs:
             page.to_tab(tabs[0].id)
         else:
             self.page = page = ChromiumPage()
-        page.new_tab(url, activate)
+        self.open_as_new_tab(url, activate)
 
     def find_tab_by_url_prefix(self, prefix: str) -> Optional[BrowserTab]:
         return max(filter(lambda x: x.url.startswith(prefix), self.tabs),
@@ -275,12 +294,23 @@ class Browser:
             raise TabNotFoundError(f'url={url_prefix}')
         self.page.to_tab(tab.id, activate)
 
-    def jump_to(self, url):
-        self.page.get(url)
+    def open_as_new_tab(self, url: str, activate: bool = False):
+        old_ids = set(map(lambda x: x.id, self.tabs))
+        self.page.run_cdp('Target.createTarget', url=url, background=True)
+        while len(self.tabs) == old_ids:
+            time.sleep(.005)
+        new_tab = next(filter(lambda x: x.id not in old_ids, self.tabs), None)
+        if new_tab:
+            self.page.to_tab(new_tab.id, activate)
+
+    def close_tab(self, url):
+        tab = self.find_tab_by_url_prefix(url)
+        if tab:
+            self.__close_target(tab.id)
 
     def search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
         return DomSearcher([PageElement(x, loc_str) for x
-                            in self.page.eles(loc_str, timeout=timeout)], '$')
+                            in self.page.eles(loc_str, timeout=timeout)], loc_str)
 
     async def async_search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
         end = time.perf_counter() + timeout
