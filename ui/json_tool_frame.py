@@ -16,6 +16,8 @@ from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QM
 
 import mywidgets.dialog as my_dialog
 
+JSON_ROOT_PATH = '$'
+
 
 class CancelableTask:
     def __init__(self, task: Task, cancel_callback: Callable[[], None]):
@@ -137,12 +139,12 @@ class JsonViewerFrame(QFrame):
         self.refresh_json_tree()
         self.init_menu()
 
-    def refresh_json_tree(self, json_path='$'):
+    def refresh_json_tree(self, json_path=JSON_ROOT_PATH):
         self.update_json_tree(self.data)
         if json_path:
             self.jsonPathChanged.emit(json_path)
 
-    def update_json_tree(self, data: Union[dict, list, Any], json_path='$'):
+    def update_json_tree(self, data: Union[dict, list, Any], json_path=JSON_ROOT_PATH):
         tree_widget = self.ui.json_tree_widget
         tree_widget.clear()
         self.create_sub_items(tree_widget, data, json_path)
@@ -210,7 +212,10 @@ class JsonViewerFrame(QFrame):
         widget.customContextMenuRequested.connect(_popup_item_menu)
 
     def _item_json_value(self, item: QTreeWidgetItem):
-        return jsonpath.jsonpath(self.data, item.data(0, self.JSON_PATH_ROLE))[0]
+        json_path = item.data(0, self.JSON_PATH_ROLE)
+        if JSON_ROOT_PATH == json_path:
+            return self.data
+        return jsonpath.jsonpath(self.data, json_path)[0]
 
     def show_and_expand_recursively(self, item: QTreeWidgetItem):
         item.setExpanded(True)
@@ -241,9 +246,7 @@ class JsonViewerFrame(QFrame):
 
     def focus_item(self, item: QTreeWidgetItem):
         json_path = item.data(0, self.JSON_PATH_ROLE)
-        if not json_path:
-            return
-        data = jsonpath.jsonpath(self.data, json_path)
+        data = self.data if JSON_ROOT_PATH == json_path else jsonpath.jsonpath(self.data, json_path)
         if not data:
             box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '节点无数据',
                               QMessageBox.StandardButton.Close, self.ui.json_tree_widget)
@@ -263,9 +266,11 @@ class JsonViewerFrame(QFrame):
 
     @Slot(str)
     def go_json_path(self, json_path: str):
+        if not json_path:
+            return
         edit_widget = self.ui.json_path_edit_widget
-        data = jsonpath.jsonpath(self.data, json_path)
-        data = data[0] if len(data) == 1 else data
+        data = self.data if json_path == JSON_ROOT_PATH else jsonpath.jsonpath(self.data, json_path)
+        data = data[0] if isinstance(data, list) and len(data) == 1 else data
         if data:
             self.update_json_tree(data, json_path)
             edit_widget.setStyleSheet('')

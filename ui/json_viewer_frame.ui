@@ -97,7 +97,7 @@
    <sender>json_path_edit_widget</sender>
    <signal>textChanged(QString)</signal>
    <receiver>JsonViewerFrame</receiver>
-   <slot>search_json(QString)</slot>
+   <slot>go_json_path(QString)</slot>
    <hints>
     <hint type="sourcelabel">
      <x>107</x>
