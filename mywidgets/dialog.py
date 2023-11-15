@@ -1,7 +1,7 @@
 from typing import Optional, Callable
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QInputDialog
+from PySide6.QtWidgets import QWidget, QInputDialog, QMessageBox
 
 
 def show_input_dialog(title: str, label: str, parent: Optional[QWidget] = None, *,
@@ -63,3 +63,20 @@ def show_multi_line_input_dialog(title: str, label: str, parent: Optional[QWidge
                                   option=QInputDialog.InputDialogOption.UsePlainTextEditForTextInput,
                                   window_modal=window_modal)
     dialog.open()
+
+
+def show_message(icon: QMessageBox.Icon, title: str, text, *,
+                 parent: QWidget = None,
+                 detail: str = None,
+                 standard_buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Close,
+                 window_modal=Qt.WindowModality.WindowModal):
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setIcon(icon)
+    box.setText(text)
+    if standard_buttons:
+        box.setStandardButtons(standard_buttons)
+    if detail:
+        box.setDetailedText(detail)
+    box.setWindowModality(window_modal)
+    box.show()
