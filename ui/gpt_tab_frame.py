@@ -86,18 +86,17 @@ class GptTabFrame(QFrame):
 
     @Slot()
     def load_template_for_chat(self):
-        dialog = QFileDialog(self, '打开模板文件', gpt_prompt_file_dir(), 'JSON Files(*.json)')
-        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
-        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-
-        def load_selected_file(path):
+        def _load_file(path):
             prompt = load_prompt(path)
             self.template_file = path
             self.templateTextReset.emit(prompt.template)
             self.update_variable_form(prompt.template)
             self.statusLabelTextReset.emit(f'加载文件: {path}')
 
-        dialog.fileSelected.connect(load_selected_file)
+        dialog = QFileDialog(self, '打开模板文件', gpt_prompt_file_dir(), 'JSON Files(*.json)')
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.fileSelected.connect(_load_file)
         dialog.open()
 
     @Slot()
@@ -191,11 +190,7 @@ class GptTabFrame(QFrame):
 
     @Slot()
     def save_template(self):
-        default_path = self.template_file if self.template_file else gpt_prompt_file_dir()
-        dialog = QFileDialog(self, '保存至', default_path, 'JSON Files(*.json')
-        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
-
-        def do_save(path: str):
+        def _save_template(path: str):
             template = self.template_edit_widget.toPlainText()
             prompt = safe_parse_template(self, template)
             if not prompt:
@@ -205,7 +200,10 @@ class GptTabFrame(QFrame):
             self.ui.rename_template_btn.setEnabled(True)
             self.statusLabelTextReset.emit(f'模板保存至: {path}')
 
-        dialog.fileSelected.connect(do_save)
+        default_path = self.template_file if self.template_file else gpt_prompt_file_dir()
+        dialog = QFileDialog(self, '保存至', default_path, 'JSON Files(*.json')
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dialog.fileSelected.connect(_save_template)
         dialog.open()
 
     @Slot()

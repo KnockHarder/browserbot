@@ -6,13 +6,15 @@ import sys
 import tempfile
 from asyncio import Task
 from json import JSONDecodeError
-from typing import Optional, Union, Any, Callable
+from typing import Optional, Union, Any, Callable, IO
 
 import jsonpath
 from PySide6.QtCore import Slot, Signal, Qt, QPoint
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QTreeWidget, QMenu, \
     QInputDialog, QLineEdit, QPushButton
+
+import mywidgets.dialog as my_dialog
 
 
 class CancelableTask:
@@ -45,13 +47,9 @@ class JsonToolFrame(QFrame):
                 return
             self.ui.tabWidget.setTabText(index, name)
 
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle('更改标签名')
-        dialog.setLabelText('新名称')
-        dialog.setTextValue(self.ui.tabWidget.tabText(index))
-        dialog.textValueSelected.connect(_rename)
-        dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        dialog.show()
+        my_dialog.show_input_dialog('更改标签名', '新名称', self,
+                                    text_value=self.ui.tabWidget.tabText(index),
+                                    text_value_select_callback=_rename)
 
     def init_task_cancel_shortcut(self):
         def _cancel_task():
@@ -83,27 +81,27 @@ class JsonToolFrame(QFrame):
 
     @Slot()
     def import_from_shell(self):
-        dialog = QInputDialog(self)
-        dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        command, confirmed = dialog.getMultiLineText(dialog.parent(), '执行shell命令', 'command')
-        if not confirmed:
-            return
-        out_file = tempfile.TemporaryFile()
-        popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
-        self.set_import_enable(False)
+        def _exec_shell(command: str):
+            if not command:
+                return
+            out_file = tempfile.TemporaryFile()
+            popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
+            self.set_import_enable(False)
+            task = asyncio.create_task(_async_import_from_output(popen, out_file), name='import_from_shell')
+            self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))
 
-        async def _async_import_from_shell():
+        async def _async_import_from_output(popen: subprocess.Popen[bytes], out_file: IO[bytes]):
             while popen.poll() is None:
                 await asyncio.sleep(1)
             out_file.seek(0)
-            _update_json_by_output(str(out_file.read(), 'utf-8'))
+            _update_json_by_output(str(out_file.read(), 'utf-8'), popen.poll())
             self.set_import_enable(True)
 
-        def _update_json_by_output(output: str):
+        def _update_json_by_output(output: str, code: int):
             if not output:
                 box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '无输出内容',
                                   QMessageBox.StandardButton.Close, self)
-                box.setDetailedText(f'Code: {popen.poll()}')
+                box.setDetailedText(f'Code: {code}')
                 box.setWindowModality(Qt.WindowModality.WindowModal)
                 box.show()
                 return
@@ -116,8 +114,8 @@ class JsonToolFrame(QFrame):
                 box.setWindowModality(Qt.WindowModality.WindowModal)
                 box.show()
 
-        task = asyncio.create_task(_async_import_from_shell(), name='import_from_shell')
-        self.task_info_list.append(CancelableTask(task, lambda: self.set_import_enable(True)))
+        my_dialog.show_multi_line_input_dialog('执行shell命令', 'command', self,
+                                               text_value_select_callback=_exec_shell)
 
     def set_import_enable(self, enable):
         for child in self.children():

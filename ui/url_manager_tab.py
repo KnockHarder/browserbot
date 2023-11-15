@@ -9,9 +9,10 @@ from typing import Optional
 
 from PySide6.QtCore import Slot, Qt, QTimer
 from PySide6.QtGui import QShortcut
-from PySide6.QtWidgets import QFrame, QWidget, QInputDialog, QFileDialog, QApplication, \
+from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
     QTableWidgetItem, QMenu
 
+import mywidgets.dialog as my_dialog
 import url_manager_frame_rc
 from config import get_browser
 from config import url_table_data_dir
@@ -59,15 +60,12 @@ class UrlManagerTabFrame(QFrame):
 
     @Slot()
     def add_tab(self):
-        dialog = QInputDialog(self)
-        dialog.setLabelText('新的TAB页名称')
-
         def create_new_tab(name: str):
             index = self.create_tab_from_data(name)
             self.ui.tabWidget.setCurrentIndex(index)
 
-        dialog.textValueSelected.connect(create_new_tab)
-        dialog.open()
+        my_dialog.show_input_dialog('新增标签页', '名称', self,
+                                    text_value_select_callback=create_new_tab)
 
     def create_tab_from_data(self, tab_name: str, urls: list = None, table_id: str = None):
         tab_widget = self.ui.tabWidget
@@ -78,25 +76,20 @@ class UrlManagerTabFrame(QFrame):
 
     @Slot()
     def add_tab_from_file(self):
+        def _select_tabs_in_file(path: str):
+            tabs = read_tab_data_from_file(path)
+            my_dialog.show_items_select_dialog('选取加载TAB页', [data['tabName'] for data in tabs], self,
+                                               text_value_selected_func=lambda name: _load_tab_selected(name, tabs))
+
+        def _load_tab_selected(tab_name: str, tabs: list[dict]):
+            data = next(filter(lambda x: x['tabName'] == tab_name, tabs), None)
+            idx = self.create_tab_from_data(tab_name, data['urls'], data.get('id'))
+            self.ui.tabWidget.setCurrentIndex(idx)
+
         dialog = QFileDialog(self, '加载链接表', url_table_data_dir(), 'JSON Files(*.json)')
         dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-
-        def load_tab_with_selection(path: str):
-            tabs = read_tab_data_from_file(path)
-            dialog1 = QInputDialog(self)
-            dialog1.setComboBoxItems([data['tabName'] for data in tabs])
-            dialog1.setOption(QInputDialog.InputDialogOption.UseListViewForComboBoxItems)
-
-            def load_tab_selected(tab_name: str):
-                data = next(filter(lambda x: x['tabName'] == tab_name, tabs), None)
-                idx = self.create_tab_from_data(tab_name, data['urls'], data.get('id'))
-                self.ui.tabWidget.setCurrentIndex(idx)
-
-            dialog1.textValueSelected.connect(load_tab_selected)
-            dialog1.open()
-
-        dialog.fileSelected.connect(load_tab_with_selection)
+        dialog.fileSelected.connect(_select_tabs_in_file)
         dialog.open()
 
     def archive_tab(self, index: int):
@@ -117,18 +110,12 @@ class UrlManagerTabFrame(QFrame):
         tab_widget.removeTab(index)
 
     def rename_tab(self, index: int):
-        tab_widget = self.ui.tabWidget
+        def _rename_tab(name: str):
+            self.ui.tabWidget.setTabText(index, name)
 
-        dialog = QInputDialog(self)
-        dialog.setLabelText('新的标签名')
-        dialog.setTextValue(tab_widget.tabText(index))
-
-        def rename_tab_to(name: str):
-            tab_widget.setTabText(index, name)
-
-        dialog.textValueSelected.connect(rename_tab_to)
-        dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        dialog.show()
+        my_dialog.show_input_dialog('重命名标签页', '名称', self,
+                                    text_value=self.ui.tabWidget.tabText(index),
+                                    text_value_select_callback=_rename_tab)
 
     def save_to_json(self):
         while self.is_saving:
