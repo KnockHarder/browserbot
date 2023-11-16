@@ -30,15 +30,42 @@
     <number>0</number>
    </property>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout_4">
-     <item>
-      <widget class="QPushButton" name="refresh_btn">
-       <property name="text">
-        <string>刷新</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
+    <widget class="QWidget" name="widget" native="true">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="message_label">
+        <property name="text">
+         <string>TextLabel</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="refresh_btn">
+        <property name="maximumSize">
+         <size>
+          <width>80</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>刷新</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <layout class="QFormLayout" name="formLayout">
@@ -106,8 +133,8 @@
    <slot>search_json(QString)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>145</x>
-     <y>38</y>
+     <x>219</x>
+     <y>94</y>
     </hint>
     <hint type="destinationlabel">
      <x>534</x>
@@ -122,8 +149,8 @@
    <slot>go_json_path(QString)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>107</x>
-     <y>12</y>
+     <x>181</x>
+     <y>55</y>
     </hint>
     <hint type="destinationlabel">
      <x>110</x>
@@ -142,14 +169,31 @@
      <y>32</y>
     </hint>
     <hint type="destinationlabel">
-     <x>84</x>
-     <y>16</y>
+     <x>158</x>
+     <y>59</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>JsonViewerFrame</sender>
+   <signal>messageChanged(QString)</signal>
+   <receiver>message_label</receiver>
+   <slot>setText(QString)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>238</x>
+     <y>33</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>58</x>
+     <y>20</y>
     </hint>
    </hints>
   </connection>
  </connections>
  <slots>
   <signal>jsonPathChanged(QString)</signal>
+  <signal>messageChanged(QString)</signal>
   <slot>search_json(QString)</slot>
   <slot>go_json_path(QString)</slot>
  </slots>

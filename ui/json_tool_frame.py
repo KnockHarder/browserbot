@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import subprocess
 import sys
@@ -111,6 +112,7 @@ class JsonViewerFrame(QFrame):
     JSON_VALUE_COLUMN = 1
     JSON_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
     jsonPathChanged = Signal(str)
+    messageChanged = Signal(str)
     refresh_task: CancelableTask = None
 
     def __init__(self, parent: Optional[QWidget] = None, *,
@@ -160,6 +162,8 @@ class JsonViewerFrame(QFrame):
                 return
             self.data = data
             self.refresh_json_tree(self.ui.json_path_edit_widget.text())
+            curr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.messageChanged.emit(f'于{curr}刷新')
 
         if self.data_func:
             _refresh_or_cancel()

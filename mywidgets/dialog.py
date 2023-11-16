@@ -1,7 +1,7 @@
 from typing import Optional, Callable
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QWidget, QInputDialog, QMessageBox, QAbstractButton
 
 
 def show_input_dialog(title: str, label: str, parent: Optional[QWidget] = None, *,
@@ -69,7 +69,14 @@ def show_message(icon: QMessageBox.Icon, title: str, text, *,
                  parent: QWidget = None,
                  detail: str = None,
                  standard_buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Close,
+                 standard_btn_func_map: dict[QMessageBox.StandardButton, Callable[[], None]] = None,
                  window_modal=Qt.WindowModality.WindowModal):
+    def _btn_clicked(btn: QAbstractButton):
+        standard_button = box.standardButton(btn)
+        func = standard_btn_func_map.get(standard_button) if standard_btn_func_map else None
+        if func:
+            func()
+
     box = QMessageBox(parent)
     box.setWindowTitle(title)
     box.setIcon(icon)
@@ -78,5 +85,6 @@ def show_message(icon: QMessageBox.Icon, title: str, text, *,
         box.setStandardButtons(standard_buttons)
     if detail:
         box.setDetailedText(detail)
+    box.buttonClicked.connect(_btn_clicked)
     box.setWindowModality(window_modal)
     box.show()
