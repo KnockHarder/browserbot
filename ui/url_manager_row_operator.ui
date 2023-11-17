@@ -68,5 +68,26 @@
  <resources>
   <include location="../resources/url_manager_frame.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>deleteButton</sender>
+   <signal>clicked()</signal>
+   <receiver>UrlManagerRowOperatorGroup</receiver>
+   <slot>emit_delete_signal()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>198</x>
+     <y>152</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>227</x>
+     <y>74</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <signal>deleteClicked()</signal>
+  <slot>emit_delete_signal()</slot>
+ </slots>
 </ui>

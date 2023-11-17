@@ -13,14 +13,18 @@ TIMEOUT = 5.
 
 
 class BrowserTab:
-    def __init__(self, web_tool_addr: str, tab_id: str, url: str, title: str):
+    def __init__(self, web_tool_addr: str, **kwargs):
         self.address = web_tool_addr
-        self.id = tab_id
-        self.url = url
-        self.title = title
+        self.id = kwargs['id']
+        self.url = kwargs['url']
+        self.title = kwargs['title']
+        self.websocket_url = kwargs['webSocketDebuggerUrl']
 
     def close(self):
         requests.get(f'http://{self.address}/json/close/{self.id}')
+
+    def __eq__(self, other):
+        return isinstance(other, BrowserTab) and self.id == other.id
 
 
 class TabNotFoundError(Exception):
@@ -49,6 +53,10 @@ class PageElement:
     @property
     def html(self):
         return self.element.html
+
+    @property
+    def inner_html(self):
+        return self.element.inner_html
 
     @property
     def text(self):
@@ -224,68 +232,62 @@ def _search_all_no_wait(elements: list[PageElement],
 
 
 class Browser:
-    def __init__(self):
+    def __init__(self, ip='127.0.0.1', port=9100):
+        self.ip = ip
+        self.port = port
+        self.address = f'{ip}:{port}'
         self.page = ChromiumPage()
         self.session = Session()
 
     def __chrome_targets(self):
-        agent = self.page
-        return self.session.get(f'http://{agent.address}/json').json()
+        return self.session.get(f'http://{self.address}/json').json()
 
     def __close_target(self, target_id):
-        address = self.page.address
-        self.session.get(f'http://{address}/json/close/{target_id}')
+        self.session.get(f'http://{self.address}/json/close/{target_id}')
 
     @property
     def tabs(self) -> list[BrowserTab]:
-        return [BrowserTab(self.page.address, tab['id'], tab['url'], tab['title'])
+        return [BrowserTab(self.address, **tab)
                 for tab in filter(lambda x: x['type'] == 'page', self.__chrome_targets())]
-
-    @property
-    def current_tab(self) -> BrowserTab:
-        tab_id = self.page.driver.id
-        tabs = self.tabs
-        if not tabs:
-            raise TabNotFoundError('No tab')
-        curr = next(filter(lambda x: x.id == tab_id, tabs), None)
-        if curr:
-            return curr
-        self.page.to_tab(tabs[0].id)
-        return curr
-
-    def switch_to_tab(self, tab_id):
-        self.page.to_tab(tab_id)
 
     def all_tab_with_prefix(self, url_prefix) -> list[BrowserTab]:
         return [x for x in self.tabs if x.url.startswith(url_prefix)]
 
-    def to_tab(self, tab: BrowserTab = None, tab_id: str = None, activate=False):
-        if tab:
-            tab_id = tab.id
-        self.page.to_tab(tab_id, activate)
+    def to_tab(self, tab: BrowserTab = None, activate=False):
+        tab: BrowserTab = next(filter(lambda x: x.id == tab.id, self.tabs))
+        if not tab:
+            return False
+        self.page.to_tab(tab.id, activate)
 
     def is_tab_alive(self, tab: BrowserTab):
         return tab in [x.id for x in self.tabs]
 
-    def to_url_or_open(self, url: str, new_tab=False, activate=False):
+    def to_url_or_open(self, url: str, new_tab=False, activate=False) -> BrowserTab:
         page = self.page
         if not new_tab:
             tab = self.find_tab_by_url_prefix(url)
             if tab:
                 page.to_tab(tab.id, activate)
-                return
+                return tab
         if page.is_alive:
-            self.open_as_new_tab(url, activate)
-            return
+            return self.open_as_new_tab(url, activate)
         tabs = self.tabs
         if tabs:
             page.to_tab(tabs[0].id)
         else:
-            self.page = page = ChromiumPage()
-        self.open_as_new_tab(url, activate)
+            self.page = ChromiumPage()
+        return self.open_as_new_tab(url, activate)
+
+    def open_in_tab(self, tab: BrowserTab, url: str):
+        self.page.to_tab(tab.id)
+        self.page.get(url)
 
     def find_tab_by_url_prefix(self, prefix: str) -> Optional[BrowserTab]:
         return max(filter(lambda x: x.url.startswith(prefix), self.tabs),
+                   default=None, key=lambda y: len(y.url))
+
+    def find_tab_by_domain(self, domain: str) -> Optional[BrowserTab]:
+        return max(filter(lambda x: domain in x.url, self.tabs),
                    default=None, key=lambda y: len(y.url))
 
     def find_and_switch(self, url_prefix: str, activate=False):
@@ -294,7 +296,7 @@ class Browser:
             raise TabNotFoundError(f'url={url_prefix}')
         self.page.to_tab(tab.id, activate)
 
-    def open_as_new_tab(self, url: str, activate: bool = False):
+    def open_as_new_tab(self, url: str, activate: bool = False) -> BrowserTab:
         old_ids = set(map(lambda x: x.id, self.tabs))
         self.page.run_cdp('Target.createTarget', url=url, background=True)
         while len(self.tabs) == old_ids:
@@ -302,6 +304,7 @@ class Browser:
         new_tab = next(filter(lambda x: x.id not in old_ids, self.tabs), None)
         if new_tab:
             self.page.to_tab(new_tab.id, activate)
+        return new_tab
 
     def close_tab(self, url):
         tab = self.find_tab_by_url_prefix(url)
