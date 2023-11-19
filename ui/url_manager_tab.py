@@ -447,7 +447,7 @@ class OperatorColumnItemDelegate(QAbstractItemDelegate):
         widget.setLayout(QHBoxLayout(widget))
         widget.layout().setContentsMargins(0, 0, 0, 0)
         delete_btn = QPushButton(QPixmap(':/rowOperator/delete.svg').scaled(14, 14), None, widget)
-        delete_btn.setMinimumSize(30, 30)
+        delete_btn.setFixedWidth(30)
         delete_btn.setStyleSheet('border: none')
         delete_btn.clicked.connect(_delete_row)
         widget.layout().addWidget(delete_btn)
