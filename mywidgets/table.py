@@ -50,13 +50,17 @@ class AccessibleTableUi:
         self.add_row_buttons = self.add_row_buttons[: size]
         buttons = self.add_row_buttons
         for i in range(len(buttons), size):
-            btn = QPushButton(QPixmap(u":/tableRow/add.svg").scaled(10, 4), None, self.view)
-            btn.move(-10, -10)
-            btn.setFixedHeight(6)
-            btn.setStyleSheet('background-color: #AA87CEEB; border: none')
-            btn.clicked.connect(lambda: self.model.insertRow(i))
+            btn = self.create_add_row_button(i)
             btn.hide()
             buttons.append(btn)
+
+    def create_add_row_button(self, row: int):
+        btn = QPushButton(QPixmap(u":/tableRow/add.svg").scaled(10, 4), None, self.view)
+        btn.move(-10, -10)
+        btn.setFixedHeight(6)
+        btn.setStyleSheet('background-color: #AA87CEEB; border: none')
+        btn.clicked.connect(lambda: self.model.insertRow(row))
+        return btn
 
     def update_add_row_buttons(self):
         buttons = self.add_row_buttons

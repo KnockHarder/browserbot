@@ -6,11 +6,13 @@ import time
 import uuid
 from typing import Optional, Union, Any
 
-from PySide6.QtCore import Slot, Qt, QTimer, QModelIndex, QPersistentModelIndex, QAbstractItemModel, QObject, QEvent, \
-    Signal
-from PySide6.QtGui import QShortcut, QPalette, QBrush, QPaintEvent, QHoverEvent
+from PySide6.QtCore import Slot, Qt, QTimer, QModelIndex, QPersistentModelIndex, QAbstractItemModel, QEvent, \
+    Signal, QRect
+from PySide6.QtGui import QShortcut, QPalette, QBrush, QPaintEvent, QHoverEvent, QPainter, QTextDocument, QKeySequence, \
+    QPixmap
 from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
-    QMenu, QAbstractItemView, QDialog, QFormLayout, QLineEdit, QVBoxLayout, QPushButton, QHBoxLayout, QTableView
+    QMenu, QAbstractItemView, QFormLayout, QLineEdit, QTableView, \
+    QStyleOptionViewItem, QAbstractItemDelegate, QHBoxLayout, QPushButton
 
 import mywidgets.dialog as my_dialog
 import url_manager_frame_rc
@@ -79,7 +81,7 @@ class UrlManagerTabFrame(QFrame):
             index = self.create_tab_from_data(name)
             self.ui.tabWidget.setCurrentIndex(index)
 
-        my_dialog.show_input_dialog('新增标签页', '名称', self,
+        my_dialog.show_input_dialog('新增标签页', '标签页名称', self,
                                     text_value_select_callback=create_new_tab)
 
     def create_tab_from_data(self, tab_name: str, urls: list = None, table_id: str = None):
@@ -128,9 +130,12 @@ class UrlManagerTabFrame(QFrame):
         def _rename_tab(name: str):
             self.ui.tabWidget.setTabText(index, name)
 
-        my_dialog.show_input_dialog('重命名标签页', '名称', self,
-                                    text_value=self.ui.tabWidget.tabText(index),
-                                    text_value_select_callback=_rename_tab)
+        if index >= 0:
+            my_dialog.show_input_dialog('重命名标签页', '标签页名称', self,
+                                        text_value=self.ui.tabWidget.tabText(index),
+                                        text_value_select_callback=_rename_tab)
+        else:
+            self.add_tab()
 
     def save_to_json(self):
         while self.is_saving:
@@ -182,11 +187,13 @@ class UrlTableView(QTableView):
         self.setModel(self.item_model)
         self.accessible_ui = AccessibleTableUi(self, self.item_model)
         self.accessible_ui.setup_ui()
+        self.setStyleSheet('QTableView::item:selected {background-color: #6666ffff}')
         _ = [self.setColumnWidth(idx, width) for idx, width in enumerate([100, 200, 200])]
         self.init_menu()
-        self.setEditTriggers(QAbstractItemView.EditTrigger.AnyKeyPressed)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
         self.doubleClicked.connect(self.go_cell_url)
-        self.item_model.needInitOperatorCell.connect(self.init_operator_widget)
+        self.setItemDelegateForColumn(UrlTableItemModel.URL_COLUMN, UrlColumnItemDelegate(self))
+        self.setItemDelegateForColumn(UrlTableItemModel.OPERATOR_COLUMN, OperatorColumnItemDelegate(self))
 
     def paintEvent(self, e: QPaintEvent) -> None:
         super().paintEvent(e)
@@ -198,56 +205,9 @@ class UrlTableView(QTableView):
             self.accessible_ui.show_add_row_button_hovered(e)
         return result
 
-    def edit(self, index: Union[QModelIndex, QPersistentModelIndex],
-             trigger: QAbstractItemView.EditTrigger = None, event=None) -> bool:
-        def _update_url_column():
-            url_data.name = name_input_widget.text()
-            url_data.url = url_input_widget.text()
-            dialog.close()
-            self.model().dataChanged.emit(index, index, Qt.ItemDataRole.DisplayRole)
-
-        if (trigger and trigger & self.editTriggers()
-                and index.isValid() and index.column() == UrlTableItemModel.URL_COLUMN):
-            url_data = self.row_url_data(index.row())
-            dialog = QDialog(self)
-            dialog.setLayout(QVBoxLayout(dialog))
-
-            layout = QFormLayout(dialog)
-            name_input_widget = QLineEdit(url_data.name, dialog)
-            layout.addRow('名称', name_input_widget)
-            url_input_widget = QLineEdit(url_data.url, dialog)
-            layout.addRow('链接', url_input_widget)
-            widget = QWidget(dialog)
-            widget.setLayout(layout)
-            dialog.layout().addWidget(widget)
-
-            layout = QHBoxLayout(dialog)
-            button = QPushButton('确认', dialog)
-            button.clicked.connect(_update_url_column)
-            layout.addWidget(button)
-            button = QPushButton('取消', dialog)
-            button.clicked.connect(lambda: dialog.close())
-            layout.addWidget(button)
-            widget = QWidget(dialog)
-            widget.setLayout(layout)
-            dialog.layout().addWidget(widget)
-            dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-            dialog.setWindowModality(Qt.WindowModality.WindowModal)
-            dialog.show()
-            return False
-        return False
-
-    def editorDestroyed(self, editor: QObject) -> None:
-        self.resizeColumnToContents(0)
-
     def row_url_data(self, visual_row: int):
         logical_row = self.verticalHeader().logicalIndex(visual_row)
         return self.item_model.url_list[logical_row]
-
-    def init_operator_widget(self, index: Union[QModelIndex, QPersistentModelIndex]):
-        widget = TableRowOperatorWidget(self)
-        widget.deleteClicked.connect(self.delete_row_by_click)
-        self.setIndexWidget(index, widget)
 
     def delete_row_by_click(self):
         widget = self.sender()
@@ -295,7 +255,6 @@ class UrlTableItemModel(QAbstractItemModel):
     URL_COLUMN = 1
     OPERATOR_COLUMN = 2
     URL_FOREGROUND = QBrush(QApplication.palette().color(QPalette.ColorRole.Link))
-    needInitOperatorCell = Signal(QModelIndex)
 
     def __init__(self, view: QTableView, url_list: list[UrlData]):
         super().__init__(view)
@@ -332,18 +291,33 @@ class UrlTableItemModel(QAbstractItemModel):
         url_data = self.url_list[index.row()]
         column = index.column()
         if column == self.CATEGORY_COLUMN:
-            if role == Qt.ItemDataRole.DisplayRole:
+            if role in [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]:
                 return url_data.category
-        elif column == self.URL_COLUMN:
-            if role == Qt.ItemDataRole.DisplayRole:
-                return url_data.name
-            elif role == Qt.ItemDataRole.ForegroundRole and url_data.url:
-                return self.URL_FOREGROUND
-        elif column == self.OPERATOR_COLUMN:
-            if role == Qt.ItemDataRole.DisplayRole:
-                if not self.view.indexWidget(index):
-                    self.needInitOperatorCell.emit(index)
         return None
+
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+        flag = super().flags(index)
+        if index.column() in [self.CATEGORY_COLUMN, self.URL_COLUMN]:
+            flag |= Qt.ItemFlag.ItemIsEditable
+        return flag
+
+    def setData(self, index: Union[QModelIndex, QPersistentModelIndex], value: Any, role: int = 0) -> bool:
+        if not index.isValid():
+            return False
+        url_data = self.url_list[index.row()]
+        column = index.column()
+        if column == self.CATEGORY_COLUMN:
+            if role == Qt.ItemDataRole.EditRole:
+                url_data.category = str(value)
+                self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
+                return True
+        return False
+
+    def update_url(self, index: Union[QModelIndex, QPersistentModelIndex], name: str, value: str):
+        url_data = self.url_list[index.row()]
+        url_data.name = name
+        url_data.url = value
+        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
 
     def insertRow(self, row: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> bool:
         self.beginInsertRows(parent, row, row)
@@ -360,18 +334,124 @@ class UrlTableItemModel(QAbstractItemModel):
         return True
 
 
-class TableRowOperatorWidget(QWidget):
-    deleteClicked = Signal()
-
-    def __init__(self, parent: Optional[QWidget] = None):
+class UrlColumnItemDelegate(QAbstractItemDelegate):
+    def __init__(self, parent: UrlTableView):
         super().__init__(parent)
 
-        from ui.url_manager_row_operator_uic import Ui_UrlManagerRowOperatorGroup
-        self.ui = Ui_UrlManagerRowOperatorGroup()
-        self.ui.setupUi(self)
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem,
+                     index: Union[QModelIndex, QPersistentModelIndex]) -> QWidget:
+        widget = UrlEditWidget(parent)
+        widget.accepted.connect(lambda: self.commitData.emit(widget))
+        widget.finished.connect(lambda: self.closeEditor.emit(widget))
+        return widget
 
-    def emit_delete_signal(self):
-        self.deleteClicked.emit()
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem,
+              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        if not index.isValid():
+            return
+        model: UrlTableItemModel = index.model()
+        url_data = model.url_list[index.row()]
+        document = QTextDocument(self.parent())
+        document.setHtml(f'<a href="{url_data.url}">{url_data.name}</a>')
+        painter.save()
+        painter.translate(option.rect.topLeft())
+        document.drawContents(painter)
+        painter.restore()
+
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        if not isinstance(editor, UrlEditWidget):
+            return
+        model: UrlTableItemModel = index.model()
+        url_data = model.url_list[index.row()]
+        editor.set_value(url_data)
+
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel,
+                     index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        if not isinstance(editor, UrlEditWidget) or not isinstance(model, UrlTableItemModel):
+            return
+        model.update_url(index, editor.get_name_value(), editor.get_url_value())
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
+                             index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        rect: QRect = option.rect
+        editor.move(rect.topLeft())
+
+
+class UrlEditWidget(QFrame):
+    accepted = Signal()
+    finished = Signal()
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+
+        layout = QFormLayout(self)
+        layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        self.setLayout(layout)
+        self._name_widget = QLineEdit(self)
+        self._name_widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        layout.addRow('名称', self._name_widget)
+        self._url_widget = QLineEdit(self)
+        layout.addRow('链接', self._url_widget)
+
+        self.setWindowFlag(Qt.WindowType.SubWindow | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet('background-color: white')
+        self.setFixedWidth(300)
+        self.setTabOrder(self._name_widget, self._url_widget)
+        self.setFocusProxy(self._name_widget)
+        QShortcut(QKeySequence(Qt.Key.Key_Return), self, self.accept)
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.reject)
+
+    def accept(self):
+        self.accepted.emit()
+        self.finished.emit()
+
+    def reject(self):
+        self.finished.emit()
+
+    def get_name_value(self):
+        return self._name_widget.text()
+
+    def get_url_value(self):
+        return self._url_widget.text()
+
+    def set_value(self, url_data: UrlData):
+        self._name_widget.setText(url_data.name)
+        self._url_widget.setText(url_data.url)
+        for w in [self._name_widget, self._url_widget]:
+            if not w.hasFocus():
+                w.setCursorPosition(0)
+
+
+class OperatorColumnItemDelegate(QAbstractItemDelegate):
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem,
+              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        view: UrlTableView = option.widget
+        widget = view.indexWidget(index)
+        if not widget:
+            widget = self.create_widget(view, index)
+            view.setIndexWidget(index, widget)
+        rect: QRect = option.rect
+        widget.setGeometry(rect.x(), rect.y(), rect.width(), rect.height())
+
+    @staticmethod
+    def create_widget(view: UrlTableView, index: Union[QModelIndex, QPersistentModelIndex]):
+        def _delete_row():
+            model.removeRow(model.url_list.index(url_data))
+
+        model: UrlTableItemModel = index.model()
+        url_data = model.url_list[index.row()]
+        widget = QWidget(view)
+        widget.setLayout(QHBoxLayout(widget))
+        widget.layout().setContentsMargins(0, 0, 0, 0)
+        delete_btn = QPushButton(QPixmap(':/rowOperator/delete.svg').scaled(14, 14), None, widget)
+        delete_btn.setMinimumSize(30, 30)
+        delete_btn.setStyleSheet('border: none')
+        delete_btn.clicked.connect(_delete_row)
+        widget.layout().addWidget(delete_btn)
+        return widget
 
 
 if __name__ == '__main__':
@@ -383,7 +463,7 @@ if __name__ == '__main__':
 
         timer = QTimer(table)
         timer.timeout.connect(lambda: print(table.get_url_datas()))
-        timer.start(10_000)
+        timer.start(5_000)
         sys.exit(app.exec())
 
 
