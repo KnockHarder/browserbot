@@ -75,18 +75,18 @@ def clear_chat_history(browser: Browser):
     def _remain_time():
         return end - time.perf_counter()
 
-    history_area = browser.search_elements(
-        'tag:h3', _remain_time()).first().parent.parent
-    chat_list = history_area.search_elements('tag:li', _remain_time())
-    if not chat_list:
+    dir_elements = browser.search_elements('tag:h3', _remain_time())
+    if not dir_elements:
         raise ElementNotFoundError('NoChat')
-    for chat in chat_list:
-        chat.click()
-        history_area.search_elements('tag:button', _remain_time()).first().click()
-        browser.search_elements('tag:div@@role=menuitem@@text()=Delete chat', _remain_time()).first(
-        ).click()
-        browser.search_elements('tag:div@class:absolute', _remain_time())(
-            'tag:button@text()=Delete', _remain_time()).first().click()
+    for _dir in dir_elements:
+        history_area = _dir.parent.parent
+        for chat in history_area.search_elements('tag:li', _remain_time()):
+            chat.click()
+            history_area.search_elements('tag:button', _remain_time()).first().click()
+            browser.search_elements('tag:div@@role=menuitem@@text()=Delete chat', _remain_time()).first(
+            ).click()
+            browser.search_elements('tag:div@class:absolute', _remain_time())(
+                'tag:button@text()=Delete', _remain_time()).first().click()
 
 
 def ask_as_new_chat_and_wait(browser: Browser, question: str):

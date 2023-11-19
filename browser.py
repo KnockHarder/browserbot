@@ -8,7 +8,7 @@ from DrissionPage.chromium_element import ChromiumElement
 from DrissionPage.commons.keys import Keys
 from requests import Session
 
-FIND_INTERVAL = .5
+FIND_INTERVAL = .1
 TIMEOUT = 5.
 
 
@@ -171,7 +171,7 @@ class DomSearcher:
             found, elements = _search_all_no_wait(elements, find_no_wait, loc_desc)
             all_found += found
             if elements and time.perf_counter() < end:
-                time.sleep(1)
+                time.sleep(FIND_INTERVAL)
             else:
                 return DomSearcher(all_found, f'{self.loc_desc}-> {loc_desc}')
 
@@ -183,7 +183,7 @@ class DomSearcher:
             found, elements = _search_all_no_wait(elements, lambda e: e.eles(loc_str, timeout=0), loc_str)
             all_found += found
             if elements and time.perf_counter() < end:
-                await asyncio.sleep(1)
+                await asyncio.sleep(FIND_INTERVAL)
             else:
                 return DomSearcher(all_found, f'{self.loc_desc}-> {loc_str}')
 
