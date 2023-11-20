@@ -7,12 +7,12 @@ import uuid
 from typing import Optional, Union, Any
 
 from PySide6.QtCore import Slot, Qt, QTimer, QModelIndex, QPersistentModelIndex, QAbstractItemModel, QEvent, \
-    Signal, QRect
+    Signal, QRect, QSize
 from PySide6.QtGui import QShortcut, QPalette, QBrush, QPaintEvent, QHoverEvent, QPainter, QTextDocument, QKeySequence, \
     QPixmap
 from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
     QMenu, QAbstractItemView, QFormLayout, QLineEdit, QTableView, \
-    QStyleOptionViewItem, QAbstractItemDelegate, QHBoxLayout, QPushButton
+    QStyleOptionViewItem, QAbstractItemDelegate, QHBoxLayout, QPushButton, QStyle
 
 import mywidgets.dialog as my_dialog
 import url_manager_frame_rc
@@ -347,10 +347,7 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem,
               index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        if not index.isValid():
-            return
-        model: UrlTableItemModel = index.model()
-        url_data = model.url_list[index.row()]
+        url_data = self.get_row_data(index)
         document = QTextDocument(self.parent())
         document.setHtml(f'<a href="{url_data.url}">{url_data.name}</a>')
         painter.save()
@@ -358,11 +355,15 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
         document.drawContents(painter)
         painter.restore()
 
+    @staticmethod
+    def get_row_data(index):
+        model: UrlTableItemModel = index.model()
+        return model.url_list[index.row()]
+
     def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         if not isinstance(editor, UrlEditWidget):
             return
-        model: UrlTableItemModel = index.model()
-        url_data = model.url_list[index.row()]
+        url_data = self.get_row_data(index)
         editor.set_value(url_data)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel,
@@ -375,6 +376,11 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
                              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         rect: QRect = option.rect
         editor.move(rect.topLeft())
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+        option.features |= QStyleOptionViewItem.ViewItemFeature.HasDisplay
+        option.text = self.get_row_data(index).name
+        return QApplication.style().sizeFromContents(QStyle.ContentsType.CT_ItemViewItem, option, QSize(), None)
 
 
 class UrlEditWidget(QFrame):
@@ -452,6 +458,10 @@ class OperatorColumnItemDelegate(QAbstractItemDelegate):
         delete_btn.clicked.connect(_delete_row)
         widget.layout().addWidget(delete_btn)
         return widget
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+        rect: QRect = option.rect
+        return QSize(200, rect.height())
 
 
 if __name__ == '__main__':
