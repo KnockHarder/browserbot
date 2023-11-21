@@ -1,13 +1,14 @@
 import datetime
 import json
 import os
+import pickle
 import sys
 import time
 import uuid
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Sequence
 
 from PySide6.QtCore import Slot, Qt, QTimer, QModelIndex, QPersistentModelIndex, QAbstractItemModel, QEvent, \
-    Signal, QRect, QSize
+    Signal, QRect, QSize, QMimeData
 from PySide6.QtGui import QShortcut, QPalette, QBrush, QPaintEvent, QHoverEvent, QPainter, QTextDocument, QKeySequence, \
     QPixmap
 from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
@@ -188,12 +189,15 @@ class UrlTableView(QTableView):
         self.accessible_ui = AccessibleTableUi(self, self.item_model)
         self.accessible_ui.setup_ui()
         self.setStyleSheet('QTableView::item:selected {background-color: #6666ffff}')
-        _ = [self.setColumnWidth(idx, width) for idx, width in enumerate([100, 200, 200])]
-        self.init_menu()
-        self.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
-        self.doubleClicked.connect(self.go_cell_url)
+
         self.setItemDelegateForColumn(UrlTableItemModel.URL_COLUMN, UrlColumnItemDelegate(self))
         self.setItemDelegateForColumn(UrlTableItemModel.OPERATOR_COLUMN, OperatorColumnItemDelegate(self))
+        self.resizeColumnsToContents()
+
+        self.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+        self.init_menu()
+        self.doubleClicked.connect(self.go_cell_url)
 
     def paintEvent(self, e: QPaintEvent) -> None:
         super().paintEvent(e)
@@ -205,10 +209,6 @@ class UrlTableView(QTableView):
             self.accessible_ui.show_add_row_button_hovered(e)
         return result
 
-    def row_url_data(self, visual_row: int):
-        logical_row = self.verticalHeader().logicalIndex(visual_row)
-        return self.item_model.url_list[logical_row]
-
     def delete_row_by_click(self):
         widget = self.sender()
         for row in range(self.model().rowCount()):
@@ -218,9 +218,7 @@ class UrlTableView(QTableView):
                 return
 
     def go_cell_url(self, index: QModelIndex):
-        if index.column() != UrlTableItemModel.URL_COLUMN:
-            return
-        url = self.row_url_data(index.row()).url
+        url = index.data(UrlTableItemModel.LINK_ITEM_ROLE)
         if url:
             self.browser.to_url_or_open(url, activate=True)
 
@@ -233,7 +231,9 @@ class UrlTableView(QTableView):
                     widget.deleteLater()
 
     def get_url_datas(self) -> list:
-        return [vars(self.row_url_data(i)) for i in range(self.model().rowCount())]
+        return list(map(lambda data: vars(data),
+                        map(lambda i: self.item_model.url_list[i],
+                            map(lambda i: self.verticalHeader().logicalIndex(i), range(self.model().rowCount())))))
 
     def init_menu(self):
         menu = self.menu = QMenu(self)
@@ -245,7 +245,7 @@ class UrlTableView(QTableView):
     def open_selected_urls(self):
         indexes = self.selectedIndexes()
         for idx in indexes:
-            url = self.row_url_data(idx.row()).url
+            url = idx.data(UrlTableItemModel.LINK_ITEM_ROLE)
             if url:
                 self.browser.to_url_or_open(url, activate=True)
 
@@ -254,10 +254,13 @@ class UrlTableItemModel(QAbstractItemModel):
     CATEGORY_COLUMN = 0
     URL_COLUMN = 1
     OPERATOR_COLUMN = 2
+    LINK_ITEM_ROLE = Qt.ItemDataRole.UserRole
+    URL_DATA_LIST_TYPE = 'application/x-url-data-index-list'
     URL_FOREGROUND = QBrush(QApplication.palette().color(QPalette.ColorRole.Link))
 
     def __init__(self, view: QTableView, url_list: list[UrlData]):
         super().__init__(view)
+
         self.view = view
         self.url_list = list(url_list) if url_list else []
 
@@ -286,38 +289,38 @@ class UrlTableItemModel(QAbstractItemModel):
         return None
 
     def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = -1) -> Any:
-        if not index.isValid():
-            return None
         url_data = self.url_list[index.row()]
-        column = index.column()
+        url_data_attr = self.get_url_data_attr(index.column(), role)
+        return url_data.__getattribute__(url_data_attr) if url_data_attr else None
+
+    def get_url_data_attr(self, column: int, role: int) -> str:
         if column == self.CATEGORY_COLUMN:
-            if role in [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]:
-                return url_data.category
-        return None
+            return {
+                Qt.ItemDataRole.DisplayRole.value: 'category',
+                Qt.ItemDataRole.EditRole.value: 'category'
+            }.get(role)
+        elif column == self.URL_COLUMN:
+            return {
+                Qt.ItemDataRole.DisplayRole.value: 'name',
+                self.LINK_ITEM_ROLE: 'url'
+            }.get(role)
+        else:
+            return ''
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         flag = super().flags(index)
         if index.column() in [self.CATEGORY_COLUMN, self.URL_COLUMN]:
-            flag |= Qt.ItemFlag.ItemIsEditable
+            flag |= Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled
         return flag
 
     def setData(self, index: Union[QModelIndex, QPersistentModelIndex], value: Any, role: int = 0) -> bool:
-        if not index.isValid():
-            return False
-        url_data = self.url_list[index.row()]
-        column = index.column()
-        if column == self.CATEGORY_COLUMN:
-            if role == Qt.ItemDataRole.EditRole:
-                url_data.category = str(value)
-                self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
-                return True
+        url_data_attr = self.get_url_data_attr(index.column(), role)
+        if url_data_attr:
+            url_data = self.url_list[index.row()]
+            url_data.__setattr__(url_data_attr, value)
+            self.dataChanged.emit(index, index)
+            return True
         return False
-
-    def update_url(self, index: Union[QModelIndex, QPersistentModelIndex], name: str, value: str):
-        url_data = self.url_list[index.row()]
-        url_data.name = name
-        url_data.url = value
-        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
 
     def insertRow(self, row: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> bool:
         self.beginInsertRows(parent, row, row)
@@ -333,6 +336,32 @@ class UrlTableItemModel(QAbstractItemModel):
         self.endRemoveRows()
         return True
 
+    def mimeTypes(self) -> list[str]:
+        return [self.URL_DATA_LIST_TYPE]
+
+    def mimeData(self, indexes: Sequence[QModelIndex]) -> QMimeData:
+        data = QMimeData()
+        if not indexes:
+            return data
+        first = indexes[0]
+        data.setData(self.URL_DATA_LIST_TYPE, pickle.dumps((first.row(), first.column())))
+        return data
+
+    def dropMimeData(self, data: QMimeData, action: Qt.DropAction, row: int, column: int,
+                     parent: Union[QModelIndex, QPersistentModelIndex]) -> bool:
+        raw = data.data(self.URL_DATA_LIST_TYPE)
+        if not row:
+            return False
+        source_index = self.createIndex(*pickle.loads(raw))
+        changed = False
+        for role in range(UrlTableItemModel.LINK_ITEM_ROLE + 1):
+            source_value = self.data(source_index, role)
+            if source_value:
+                self.setData(parent, source_value, role)
+                self.dataChanged.emit(parent, parent, [role])
+                changed = True
+        return changed
+
 
 class UrlColumnItemDelegate(QAbstractItemDelegate):
     def __init__(self, parent: UrlTableView):
@@ -347,30 +376,27 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem,
               index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        url_data = self.get_row_data(index)
         document = QTextDocument(self.parent())
-        document.setHtml(f'<a href="{url_data.url}">{url_data.name}</a>')
+        url = index.data(UrlTableItemModel.LINK_ITEM_ROLE)
+        name = index.data(Qt.ItemDataRole.DisplayRole)
+        document.setHtml(f'<a href="{url}">{name}</a>')
         painter.save()
         painter.translate(option.rect.topLeft())
         document.drawContents(painter)
         painter.restore()
 
-    @staticmethod
-    def get_row_data(index):
-        model: UrlTableItemModel = index.model()
-        return model.url_list[index.row()]
-
     def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         if not isinstance(editor, UrlEditWidget):
             return
-        url_data = self.get_row_data(index)
-        editor.set_value(url_data)
+        editor.set_value(index.data(Qt.ItemDataRole.DisplayRole), index.data(UrlTableItemModel.LINK_ITEM_ROLE))
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel,
                      index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         if not isinstance(editor, UrlEditWidget) or not isinstance(model, UrlTableItemModel):
             return
-        model.update_url(index, editor.get_name_value(), editor.get_url_value())
+        index.model().setData(index, editor.get_name_value(), Qt.ItemDataRole.DisplayRole)
+        index.model().setData(index, editor.get_url_value(), UrlTableItemModel.LINK_ITEM_ROLE)
+        self.sizeHintChanged.emit(index)
 
     def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
                              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
@@ -379,7 +405,7 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         option.features |= QStyleOptionViewItem.ViewItemFeature.HasDisplay
-        option.text = self.get_row_data(index).name
+        option.text = index.data(Qt.ItemDataRole.DisplayRole)
         return QApplication.style().sizeFromContents(QStyle.ContentsType.CT_ItemViewItem, option, QSize(), None)
 
 
@@ -420,9 +446,9 @@ class UrlEditWidget(QFrame):
     def get_url_value(self):
         return self._url_widget.text()
 
-    def set_value(self, url_data: UrlData):
-        self._name_widget.setText(url_data.name)
-        self._url_widget.setText(url_data.url)
+    def set_value(self, name: str, url: str):
+        self._name_widget.setText(name)
+        self._url_widget.setText(url)
         for w in [self._name_widget, self._url_widget]:
             if not w.hasFocus():
                 w.setCursorPosition(0)
