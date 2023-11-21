@@ -262,7 +262,7 @@ class Browser:
     def is_tab_alive(self, tab: BrowserTab):
         return tab in [x.id for x in self.tabs]
 
-    def to_url_or_open(self, url: str, new_tab=False, activate=False) -> BrowserTab:
+    def to_url_or_open(self, url: str, *, new_tab=False, activate=False) -> BrowserTab:
         page = self.page
         if not new_tab:
             tab = self.find_tab_by_url_prefix(url)
