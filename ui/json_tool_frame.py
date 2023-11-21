@@ -7,12 +7,12 @@ import tempfile
 import time
 from asyncio import Task
 from json import JSONDecodeError
-from typing import Optional, Union, Any, Callable, Coroutine
+from typing import Optional, Any, Callable, Coroutine
 
 import jsonpath
 from PySide6.QtCore import Slot, Signal, Qt, QPoint
 from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QTreeWidget, QMenu, \
+from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QMenu, \
     QInputDialog, QLineEdit, QPushButton
 
 import mywidgets.dialog as my_dialog
@@ -109,6 +109,7 @@ class JsonToolFrame(QFrame):
 
 
 class JsonViewerFrame(QFrame):
+    USER_DATA_ITEM_COL = 0
     JSON_VALUE_COLUMN = 1
     JSON_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
     jsonPathChanged = Signal(str)
@@ -177,29 +178,28 @@ class JsonViewerFrame(QFrame):
         if json_path:
             self.jsonPathChanged.emit(json_path)
 
-    def update_json_tree(self, data: Union[dict, list, Any], json_path=JSON_ROOT_PATH):
+    def update_json_tree(self, data: Any, json_path=JSON_ROOT_PATH):
         tree_widget = self.ui.json_tree_widget
         tree_widget.clear()
-        self.create_sub_items(tree_widget, data, json_path)
-        if not tree_widget.topLevelItemCount():
-            tree_widget.addTopLevelItem(QTreeWidgetItem(tree_widget, [str(data)]))
-        self.jsonPathChanged.emit(json_path)
+
+        item = QTreeWidgetItem(tree_widget, [json_path])
+        item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, json_path)
+        tree_widget.addTopLevelItem(item)
+        self.create_sub_items(item, data, json_path)
+        if item.childCount() > 0:
+            item.setExpanded(True)
+        else:
+            item.setText(self.JSON_VALUE_COLUMN, str(data))
         self.search_json(self.ui.search_text_edit_widget.text())
         tree_widget.resizeColumnToContents(0)
 
-    def create_sub_items(self, parent: Union[QTreeWidget, QTreeWidgetItem], data, json_path: str):
-        def _add_child(_item: QTreeWidgetItem):
-            if isinstance(parent, QTreeWidget):
-                parent.addTopLevelItem(_item)
-            else:
-                parent.addChild(_item)
-
+    def create_sub_items(self, parent: QTreeWidgetItem, data, json_path: str):
         if isinstance(data, dict):
             for key, value in data.items():
                 item = QTreeWidgetItem(parent, [key])
-                _add_child(item)
+                parent.addChild(item)
                 item_path = f'{json_path}.{key}'
-                item.setData(0, self.JSON_PATH_ROLE, item_path)
+                item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, item_path)
                 self.create_sub_items(item, value, item_path)
                 if not item.childCount():
                     item.setText(self.JSON_VALUE_COLUMN, str(value))
@@ -208,9 +208,9 @@ class JsonViewerFrame(QFrame):
         elif isinstance(data, list):
             for index, value in enumerate(data):
                 item = QTreeWidgetItem(parent, [f'[{index}]'])
-                _add_child(item)
+                parent.addChild(item)
                 item_path = f'{json_path}[{index}]'
-                item.setData(0, self.JSON_PATH_ROLE, item_path)
+                item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, item_path)
                 self.create_sub_items(item, value, item_path)
                 if not item.childCount():
                     item.setText(self.JSON_VALUE_COLUMN, str(value))
@@ -280,14 +280,7 @@ class JsonViewerFrame(QFrame):
 
     def focus_item(self, item: QTreeWidgetItem):
         json_path = item.data(0, self.JSON_PATH_ROLE)
-        data = self.data if JSON_ROOT_PATH == json_path else jsonpath.jsonpath(self.data, json_path)
-        if not data:
-            box = QMessageBox(QMessageBox.Icon.Warning, 'Error', '节点无数据',
-                              QMessageBox.StandardButton.Close, self.ui.json_tree_widget)
-            box.setWindowModality(Qt.WindowModality.WindowModal)
-            box.show()
-            return
-        self.update_json_tree(data[0], json_path)
+        self.go_json_path(json_path)
 
     def input_and_go_json_path(self, item: QTreeWidgetItem):
         json_path = item.data(0, self.JSON_PATH_ROLE)
@@ -300,28 +293,35 @@ class JsonViewerFrame(QFrame):
 
     @Slot(str)
     def go_json_path(self, json_path: str):
-        if not json_path:
-            return
         edit_widget = self.ui.json_path_edit_widget
+        view_root_path = self.ui.json_tree_widget.topLevelItem(0).data(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE)
+        if not json_path or view_root_path == json_path:
+            edit_widget.setStyleSheet('')
+            return
         data = self.data if json_path == JSON_ROOT_PATH else jsonpath.jsonpath(self.data, json_path)
         data = data[0] if isinstance(data, list) and len(data) == 1 else data
         if data:
             self.update_json_tree(data, json_path)
             edit_widget.setStyleSheet('')
+            edit_widget.setText(json_path)
             return
         if json_path == edit_widget.text():
             edit_widget.setStyleSheet('background-color:pink;')
             return
-        box = QMessageBox(QMessageBox.Icon.Critical, 'Error', 'JSON Path无有效数据',
-                          QMessageBox.StandardButton.Close, self.ui.json_tree_widget)
-        box.setWindowModality(Qt.WindowModality.WindowModal)
-        box.show()
+        my_dialog.show_message(QMessageBox.Icon.Critical, 'Error', 'JSON Path无有效数据',
+                               parent=self.ui.json_tree_widget)
 
 
 def main():
+    from PySide6.QtAsyncio import QAsyncioEventLoopPolicy
     app = QApplication()
     frame = JsonToolFrame()
     frame.show()
+
+    asyncio.set_event_loop_policy(QAsyncioEventLoopPolicy())
+    future = asyncio.get_event_loop().create_future()
+    app.lastWindowClosed.connect(lambda: future.set_result(True))
+    asyncio.get_event_loop().run_until_complete(future)
     sys.exit(app.exec())
 
 
