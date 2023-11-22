@@ -11,7 +11,7 @@ HOME_PAGE = 'https://chat.openai.com'
 
 
 def start_new_chat(browser: Browser, activate=False):
-    browser.find_and_switch(HOME_PAGE, activate)
+    browser.find_page_and_switch(HOME_PAGE, activate)
     browser.search_elements('tag:span')(
         'tag:button@class:text-token-text-primary')[-1].click()
 
@@ -39,7 +39,7 @@ async def _async_wait_answer_done(browser: Browser, before_ask_size=0):
 
 
 async def gen_code_question(browser: Browser, prompt: BasePromptTemplate, **kwargs: Any):
-    browser.find_and_switch(HOME_PAGE)
+    browser.find_page_and_switch(HOME_PAGE)
     ask_as_new_chat(browser, prompt.format(**kwargs))
 
     chats = await _async_wait_answer_done(browser, 0)
@@ -69,7 +69,7 @@ def is_element_finished(element: PageElement):
 
 
 def clear_chat_history(browser: Browser):
-    browser.find_and_switch(HOME_PAGE)
+    browser.find_page_and_switch(HOME_PAGE)
     end = time.perf_counter() + 5
 
     def _remain_time():

@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QInputDialog, QMessageBox, QAbstractButton
@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget, QInputDialog, QMessageBox, QAbstractButto
 
 def show_input_dialog(title: str, label: str, parent: Optional[QWidget] = None, *,
                       text_value: str = None,
-                      text_value_select_callback: Callable[[str], None] = None,
+                      text_value_select_callback: Callable[[str], Any] = None,
                       window_modal=Qt.WindowModality.WindowModal):
     dialog = _create_input_dialog(title, parent,
                                   label=label,

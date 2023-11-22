@@ -76,20 +76,20 @@ def read_weixin_article(browser: Browser) -> Article:
 
 def read_all_page_articles(browser: Browser, article_url_prefix,
                            article_content_func: Callable[[Browser], Article]):
-    tab_list = browser.all_tab_with_prefix(article_url_prefix)
-    if not tab_list:
+    page_list = browser.find_pages_by_url_prefix(article_url_prefix)
+    if not page_list:
         print('Cannot find any article tab', article_url_prefix)
         return
-    while tab_list:
-        tab = tab_list.pop()
-        browser.to_tab(tab)
+    while page_list:
+        page = page_list.pop()
+        browser.to_page(page)
         article = article_content_func(browser)
-        article.url = tab.url
+        article.url = page.url
         if not article.name or not article.content:
-            print('No title or paragraph content', tab.url)
+            print('No title or paragraph content', page.url)
             continue
         summarize_article(browser, article)
-        tab.close()
+        page.close()
 
 
 def main():

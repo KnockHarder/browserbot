@@ -1,12 +1,9 @@
 import os.path
-
-from browser import Browser
+import threading
 
 DATA_DIR = os.path.expanduser('~/.my_py_datas')
-
-
-def get_browser() -> Browser:
-    return Browser()
+_LOCK = threading.Lock()
+_NEXT_ID = 1
 
 
 def gpt_prompt_file_dir() -> str:
@@ -21,6 +18,13 @@ def _init_data_dirs():
     for path in [DATA_DIR, gpt_prompt_file_dir(), url_table_data_dir()]:
         if not os.path.exists(path):
             os.mkdir(path)
+
+
+def next_id():
+    with _LOCK:
+        global _NEXT_ID
+        _NEXT_ID += 1
+    return _NEXT_ID
 
 
 _init_data_dirs()

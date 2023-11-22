@@ -11,7 +11,8 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QApp
 from jinja2 import TemplateError
 from langchain.prompts import load_prompt, PromptTemplate
 
-from config import get_browser, gpt_prompt_file_dir
+from browser import get_browser
+from config import gpt_prompt_file_dir
 from gpt import gpt_util
 from gpt.prompt import parse_template
 

@@ -6,25 +6,15 @@ import requests
 from DrissionPage import ChromiumPage
 from DrissionPage.chromium_element import ChromiumElement
 from DrissionPage.commons.keys import Keys
-from requests import Session
+
+from browser_page import BrowserPage
 
 FIND_INTERVAL = .1
 TIMEOUT = 5.
 
 
-class BrowserTab:
-    def __init__(self, web_tool_addr: str, **kwargs):
-        self.address = web_tool_addr
-        self.id = kwargs['id']
-        self.url = kwargs['url']
-        self.title = kwargs['title']
-        self.websocket_url = kwargs['webSocketDebuggerUrl']
-
-    def close(self):
-        requests.get(f'http://{self.address}/json/close/{self.id}')
-
-    def __eq__(self, other):
-        return isinstance(other, BrowserTab) and self.id == other.id
+def get_browser() -> "Browser":
+    return Browser()
 
 
 class TabNotFoundError(Exception):
@@ -236,86 +226,70 @@ class Browser:
         self.ip = ip
         self.port = port
         self.address = f'{ip}:{port}'
-        self.page = ChromiumPage()
-        self.session = Session()
-
-    def __chrome_targets(self):
-        return self.session.get(f'http://{self.address}/json').json()
-
-    def __close_target(self, target_id):
-        self.session.get(f'http://{self.address}/json/close/{target_id}')
+        self.delegate = ChromiumPage()
 
     @property
-    def tabs(self) -> list[BrowserTab]:
-        return [BrowserTab(self.address, **tab)
-                for tab in filter(lambda x: x['type'] == 'page', self.__chrome_targets())]
+    def pages(self) -> list[BrowserPage]:
+        pages_data = requests.get(f'http://{self.address}/json').json()
+        return [BrowserPage(self.address, **data)
+                for data in filter(lambda x: x['type'] == 'page', pages_data)]
 
-    def all_tab_with_prefix(self, url_prefix) -> list[BrowserTab]:
-        return [x for x in self.tabs if x.url.startswith(url_prefix)]
+    def find_pages_by_url_prefix(self, url_prefix) -> list[BrowserPage]:
+        return [x for x in self.pages if x.url.startswith(url_prefix)]
 
-    def to_tab(self, tab: BrowserTab = None, activate=False):
-        tab: BrowserTab = next(filter(lambda x: x.id == tab.id, self.tabs))
-        if not tab:
+    def find_page_by_url_prefix(self, prefix: str) -> Optional[BrowserPage]:
+        return max(self.find_pages_by_url_prefix(prefix), default=None, key=lambda x: len(x.url))
+
+    def find_page_by_domain(self, domain: str) -> Optional[BrowserPage]:
+        return max(filter(lambda x: domain in x.url, self.pages),
+                   default=None, key=lambda y: len(y.url))
+
+    def to_page(self, page: BrowserPage = None, activate=False):
+        page: BrowserPage = next(filter(lambda x: x.id == page.id, self.pages))
+        if not page:
             return False
-        self.page.to_tab(tab.id, activate)
+        self.delegate.to_tab(page.id, activate)
 
-    def to_url_or_open(self, url: str, *, new_tab=False, activate=False) -> BrowserTab:
-        page = self.page
-        if not new_tab:
-            tab = self.find_tab_by_url_prefix(url)
-            if tab:
-                page.to_tab(tab.id, activate)
-                return tab
-        if page.is_alive:
-            return self.open_as_new_tab(url, activate)
-        tabs = self.tabs
-        if tabs:
-            page.to_tab(tabs[0].id)
+    def to_page_or_open_url(self, url: str, *, force_new_page=False, activate=False) -> BrowserPage:
+        delegate = self.delegate
+        if not force_new_page:
+            page = self.find_page_by_url_prefix(url)
+            if page:
+                delegate.to_tab(page.id, activate)
+                return page
+        if delegate.is_alive:
+            return self.open_as_new_page(url, activate)
+        pages = self.pages
+        if pages:
+            delegate.to_tab(pages[0].id)
         else:
-            self.page = ChromiumPage()
-        return self.open_as_new_tab(url, activate)
+            self.delegate = ChromiumPage()
+        return self.open_as_new_page(url, activate)
 
-    def open_in_tab(self, tab: BrowserTab, url: str):
-        self.page.to_tab(tab.id)
-        self.page.get(url)
-
-    def find_tab_by_url_prefix(self, prefix: str) -> Optional[BrowserTab]:
-        return max(filter(lambda x: x.url.startswith(prefix), self.tabs),
-                   default=None, key=lambda y: len(y.url))
-
-    def find_tab_by_domain(self, domain: str) -> Optional[BrowserTab]:
-        return max(filter(lambda x: domain in x.url, self.tabs),
-                   default=None, key=lambda y: len(y.url))
-
-    def find_and_switch(self, url_prefix: str, activate=False):
-        tab = self.find_tab_by_url_prefix(url_prefix)
-        if not tab:
+    def find_page_and_switch(self, url_prefix: str, activate=False):
+        page = self.find_page_by_url_prefix(url_prefix)
+        if not page:
             raise TabNotFoundError(f'url={url_prefix}')
-        self.page.to_tab(tab.id, activate)
+        self.delegate.to_tab(page.id, activate)
 
-    def open_as_new_tab(self, url: str, activate: bool = False) -> BrowserTab:
-        old_ids = set(map(lambda x: x.id, self.tabs))
-        self.page.run_cdp('Target.createTarget', url=url, background=True)
-        while len(self.tabs) == old_ids:
+    def open_as_new_page(self, url: str, activate: bool = False) -> BrowserPage:
+        old_ids = set(map(lambda x: x.id, self.pages))
+        self.delegate.run_cdp('Target.createTarget', url=url, background=True)
+        while len(self.pages) == old_ids:
             time.sleep(.005)
-        new_tab = next(filter(lambda x: x.id not in old_ids, self.tabs), None)
-        if new_tab:
-            self.page.to_tab(new_tab.id, activate)
-        return new_tab
-
-    def close_tab(self, url):
-        tab = self.find_tab_by_url_prefix(url)
-        if tab:
-            self.__close_target(tab.id)
+        new_page = next(filter(lambda x: x.id not in old_ids, self.pages), None)
+        if new_page:
+            self.delegate.to_tab(new_page.id, activate)
+        return new_page
 
     def search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
         return DomSearcher([PageElement(x, loc_str) for x
-                            in self.page.eles(loc_str, timeout=timeout)], loc_str)
+                            in self.delegate.eles(loc_str, timeout=timeout)], loc_str)
 
     async def async_search_elements(self, loc_str: str, timeout=TIMEOUT) -> "DomSearcher":
         end = time.perf_counter() + timeout
         while True:
-            elements = self.page.eles(loc_str, timeout=0)
+            elements = self.delegate.eles(loc_str, timeout=0)
             if elements or time.perf_counter() >= end:
                 break
             else:

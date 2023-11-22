@@ -4,18 +4,18 @@ from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtGui import QPicture
 from PySide6.QtWidgets import QFrame, QWidget, QListWidgetItem
 
-import config as my_config
 import gpt.reader as gpt_reader
+from browser import Browser, get_browser
+from browser_page import BrowserPage
 from gpt.reader import Article
-from browser import Browser, BrowserTab as BrowserTab
 from mywidgets import MarkdownItemDelegate
 
 
 class PageArticleReader:
     article: Article
 
-    def __init__(self, tab: BrowserTab, page_read_func: Callable[[Browser], Article]):
-        self.tab = tab
+    def __init__(self, page: BrowserPage, page_read_func: Callable[[Browser], Article]):
+        self.page = page
         self.article_content_func = page_read_func
         self.initialized = False
 
@@ -26,16 +26,16 @@ class PageArticleReader:
 
 
 def markdown_link(reader: PageArticleReader):
-    tab = reader.tab
-    return f'[{tab.title}]({tab.url})'
+    page = reader.page
+    return f'[{page.title}]({page.url})'
 
 
-def create_page_article_reader(tab) -> Optional[PageArticleReader]:
-    if tab.url.startswith('https://mp.weixin.qq.com/s/'):
-        return PageArticleReader(tab, gpt_reader.read_weixin_article)
-    if (tab.url.startswith('https://www.infoq.cn/article')
-            or tab.url.startswith('https://www.infoq.cn/news/')):
-        return PageArticleReader(tab, gpt_reader.read_info_q_article)
+def create_page_article_reader(page: BrowserPage) -> Optional[PageArticleReader]:
+    if page.url.startswith('https://mp.weixin.qq.com/s/'):
+        return PageArticleReader(page, gpt_reader.read_weixin_article)
+    if (page.url.startswith('https://www.infoq.cn/article')
+            or page.url.startswith('https://www.infoq.cn/news/')):
+        return PageArticleReader(page, gpt_reader.read_info_q_article)
     return None
 
 
@@ -51,13 +51,13 @@ class GptReadArticleFrame(QFrame):
         self.ui.setupUi(self)
         self.ui.articleListWidget.setItemDelegate(MarkdownItemDelegate())
 
-        self.browser = my_config.get_browser()
+        self.browser = get_browser()
         self.update_article_list()
 
     @Slot()
     def update_article_list(self):
         browser = self.browser
-        readers = list(filter(lambda x: x, map(create_page_article_reader, browser.tabs)))
+        readers = list(filter(lambda x: x, map(create_page_article_reader, browser.pages)))
 
         list_widget = self.ui.articleListWidget
         list_widget.clear()

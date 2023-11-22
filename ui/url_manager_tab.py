@@ -17,7 +17,7 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
 
 import mywidgets.dialog as my_dialog
 import url_manager_frame_rc
-from config import get_browser
+from browser import get_browser
 from config import url_table_data_dir
 from mywidgets import AccessibleTableUi
 
@@ -220,7 +220,7 @@ class UrlTableView(QTableView):
     def go_cell_url(self, index: QModelIndex):
         url = index.data(UrlTableItemModel.LINK_ITEM_ROLE)
         if url:
-            self.browser.to_url_or_open(url, activate=True)
+            self.browser.to_page_or_open_url(url, activate=True)
 
     def rowsAboutToBeRemoved(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int) -> None:
         for row in range(start, end + 1):
@@ -247,7 +247,7 @@ class UrlTableView(QTableView):
         for idx in indexes:
             url = idx.data(UrlTableItemModel.LINK_ITEM_ROLE)
             if url:
-                self.browser.to_url_or_open(url, activate=True)
+                self.browser.to_page_or_open_url(url, activate=True)
 
 
 class UrlTableItemModel(QAbstractItemModel):
