@@ -394,8 +394,10 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
                      index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         if not isinstance(editor, UrlEditWidget) or not isinstance(model, UrlTableItemModel):
             return
-        index.model().setData(index, editor.get_name_value(), Qt.ItemDataRole.DisplayRole)
-        index.model().setData(index, editor.get_url_value(), UrlTableItemModel.LINK_ITEM_ROLE)
+        index.model().setItemData(index, {
+            Qt.ItemDataRole.DisplayRole: editor.get_name_value(),
+            UrlTableItemModel.LINK_ITEM_ROLE: editor.get_url_value()
+        })
         self.sizeHintChanged.emit(index)
 
     def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,

@@ -259,9 +259,6 @@ class Browser:
             return False
         self.page.to_tab(tab.id, activate)
 
-    def is_tab_alive(self, tab: BrowserTab):
-        return tab in [x.id for x in self.tabs]
-
     def to_url_or_open(self, url: str, *, new_tab=False, activate=False) -> BrowserTab:
         page = self.page
         if not new_tab:

@@ -303,7 +303,8 @@ class JsonViewerFrame(QFrame):
         if data:
             self.update_json_tree(data, json_path)
             edit_widget.setStyleSheet('')
-            edit_widget.setText(json_path)
+            if json_path != edit_widget.text():
+                edit_widget.setText(json_path)
             return
         if json_path == edit_widget.text():
             edit_widget.setStyleSheet('background-color:pink;')
