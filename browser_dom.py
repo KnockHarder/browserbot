@@ -80,11 +80,22 @@ class PageNode:
             self._object = result['object']
         return self._object['objectId']
 
-    async def click(self):
+    async def js_click(self):
         result = await self._call_function_on('function() {this.click()}')
         e = result.get('exceptionDetails')
         if e:
             raise JsExecuteException(e)
+
+    async def left_click(self):
+        await self.page.command_result('DOM.scrollIntoViewIfNeeded', COMMAND_TIMEOUT,
+                                       backendNodeId=self.backend_id)
+        result = await self.page.command_result('DOM.getContentQuads', COMMAND_TIMEOUT,
+                                                backendNodeId=self.backend_id)
+        x1, y1, x2, _, _, y2, _, _ = tuple(result['quads'][0])
+        x, y = (x1 + x2) // 2, (y1 + y2) // 2
+        for mouse_type in ['mousePressed', 'mouseReleased']:
+            await self.page.command_result('Input.dispatchMouseEvent', COMMAND_TIMEOUT,
+                                           type=mouse_type, x=x, y=y, button='left')
 
     async def _call_function_on(self, js: str):
         return await self.page.command_result('Runtime.callFunctionOn', COMMAND_TIMEOUT,

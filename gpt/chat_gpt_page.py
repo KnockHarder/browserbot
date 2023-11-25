@@ -8,17 +8,17 @@ from browser_dom import PageNode, NodePseudoType
 from browser_page import BrowserPage
 
 HOME_PAGE = 'https://chat.openai.com'
-FIND_NODE_TIMEOUT = 1
+FIND_NODE_TIMEOUT = 2
 ANSWER_WAIT_INTERVAL = 1
 
 
 class ChatGptPage:
-    _page: BrowserPage
 
     def __init__(self, browser: Optional[Browser] = None):
         if not browser:
             browser = get_browser()
         self.browser = browser
+        self._page: Optional[BrowserPage] = None
 
     async def ensure_page(self):
         if not self._page:
@@ -35,7 +35,7 @@ class ChatGptPage:
 
     async def new_chat(self):
         node = await self._query_single_d('//span//button[contains(@class, "text-token-text-primary")][last()]')
-        await node.click()
+        await node.js_click()
 
     async def ask_as_new_chat(self, ques: str):
         await self.new_chat()
@@ -99,20 +99,21 @@ class ChatGptPage:
         dir_nodes = await page.query_nodes_by_xpath('//h3', FIND_NODE_TIMEOUT)
         for node in dir_nodes:
             history_area = await self._query_single_d(f'{node.x_path}/../..')
-            chats = await page.query_nodes_by_xpath(f'{history_area.x_path}//li', FIND_NODE_TIMEOUT)
+            chats = await page.query_nodes_by_xpath(f'{history_area.x_path}//li//a', FIND_NODE_TIMEOUT)
             for chat in chats:
-                await chat.click()
-                button = await self._query_single_d(f'{history_area.x_path}//button[1]')
-                await button.click()
-                button = await self._query_single_d('//div[@role="menuitem"][text()="Delete chat"][1]')
-                await button.click()
-                button = await self._query_single_d('//div[contains(@class, "absolute"]//button[text()="Delete"][1]')
-                await button.click()
+                await chat.js_click()
+                button = await self._query_single_d(f'{history_area.x_path}//button')
+                await button.left_click()
+                button = await self._query_single_d('//div[@role="menuitem" and text()="Delete chat"][1]')
+                await button.js_click()
+                button = await self._query_single_d('//div[@role="dialog"]//button[div[text()="Delete"]][1]')
+                await button.js_click()
 
 
 def main():
+    from mythread import AsyncResult
     page = ChatGptPage()
-    page.new_chat()
+    AsyncResult.wait_done(page.clear_histories())
 
 
 if __name__ == '__main__':

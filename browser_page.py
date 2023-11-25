@@ -21,9 +21,10 @@ NODE_FIND_LOOP_INTERVAL = .1
 
 class WsRequestContext:
 
-    def __init__(self, request_id, timeout: float):
+    def __init__(self, request_id, timeout: float, params: dict):
         self.id = request_id
         self.timeout = timeout
+        self.params = params
         self.requested = False
         self.finished = False
         self._expire = time.perf_counter() + timeout
@@ -91,7 +92,7 @@ class BrowserPage:
                 data = json.loads(raw)
                 if isinstance(data, dict) and data.get('id') == context.id:
                     if data.get('error'):
-                        context.exception = CommandException(data.get('error'))
+                        context.exception = CommandException(data.get('error'), context.params)
                         return
                     else:
                         return data['result']
@@ -120,14 +121,15 @@ class BrowserPage:
 
     async def command_result(self, command: str, timeout: float, **params) -> dict:
         request_id = config.next_id()
-        context = WsRequestContext(request_id, timeout)
+        context = WsRequestContext(request_id, timeout, params)
         future = mythread.submit(lambda: self._recv_response(context))
         self._ensure_ws()
-        self._ws.send(json.dumps({
+        request = {
             'id': request_id,
             'method': command,
             'params': params
-        }))
+        }
+        self._ws.send(json.dumps(request))
         context.requested = True
         while not future.done():
             await asyncio.sleep(COMMAND_RESULT_CHECK_INTERVAL)
@@ -141,7 +143,7 @@ class BrowserPage:
         await self.command_result('DOM.enable', COMMAND_TIMEOUT)
         await self.command_result('DOM.getDocument', COMMAND_TIMEOUT)
 
-    async def _query_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
+    async def _query_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
         await self._ensure_dom_enabled()
         result: dict = await self.command_result('DOM.performSearch', query=xpath,
                                                  includeUserAgentShadowDOM=True, timeout=timeout)
@@ -155,12 +157,15 @@ class BrowserPage:
             node_ids = result['nodeIds']
             if not node_ids:
                 return []
-            nodes = list()
-            for i, _id in enumerate(node_ids):
+            data_list = list()
+            for _id in node_ids:
                 result = await self.command_result('DOM.describeNode', COMMAND_TIMEOUT,
                                                    nodeId=_id)
-                nodes.append(PageNode(self, f'{xpath}[{i}]', **result['node']))
-            return nodes
+                data_list.append(result['node'])
+            if len(data_list) == 1:
+                return [PageNode(self, f'{xpath}', **data_list[0])]
+            else:
+                return [PageNode(self, f'({xpath})[{i + 1}]', **data) for i, data in enumerate(data_list)]
         finally:
             await self.command_result('DOM.discardSearchResults', COMMAND_TIMEOUT,
                                       searchId=search_id)
@@ -169,15 +174,15 @@ class BrowserPage:
         nodes = list()
         end_time = time.perf_counter() + timeout
         while not nodes and time.perf_counter() < end_time:
-            nodes = await self.query_nodes_by_xpath(xpath, end_time - time.perf_counter())
+            nodes = await self._query_by_xpath(xpath, end_time - time.perf_counter())
             await asyncio.sleep(NODE_FIND_LOOP_INTERVAL)
         return nodes
 
     async def query_single_node_by_xpath(self, xpath: str, timeout: float) -> Optional[PageNode]:
-        nodes = await self._query_nodes_by_xpath(xpath, timeout)
+        nodes = await self.query_nodes_by_xpath(xpath, timeout)
         if len(nodes) > 1:
             raise TooMuchNodeError(f'xpath: {xpath}, len: {len(nodes)}')
-        return nodes[0]
+        return nodes[0] if nodes else None
 
     async def require_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
         nodes = await self.query_nodes_by_xpath(xpath, timeout)
