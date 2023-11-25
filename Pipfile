@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-drissionpage = "*"
 langchain = "*"
 jinja2 = "*"
 beautifulsoup4 = "*"

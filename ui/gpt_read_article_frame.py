@@ -1,4 +1,4 @@
-from typing import Optional, Callable
+from typing import Optional, Callable, Coroutine
 
 from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtGui import QPicture
@@ -14,15 +14,15 @@ from mywidgets import MarkdownItemDelegate
 class PageArticleReader:
     article: Article
 
-    def __init__(self, page: BrowserPage, page_read_func: Callable[[Browser], Article]):
+    def __init__(self, page: BrowserPage, page_read_func: Callable[[BrowserPage], Coroutine[Article]]):
         self.page = page
         self.article_content_func = page_read_func
         self.initialized = False
 
-    def get_article(self, browser: Browser) -> Article:
+    async def get_article(self) -> Article:
         if self.initialized:
             return self.article
-        self.article = self.article_content_func(browser)
+        self.article = await self.article_content_func(self.page)
 
 
 def markdown_link(reader: PageArticleReader):

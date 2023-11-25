@@ -1,29 +1,61 @@
+import asyncio
+import enum
 import json
 import time
-import traceback
-from threading import Thread
-from typing import Callable, Optional
+from typing import Optional, Any
 
 import requests
 import websocket
-from websocket import WebSocket, WebSocketTimeoutException, WebSocketConnectionClosedException
+from websocket import WebSocket
 
 import config
+import mythread
+from browser_dom import PageNode
 
-SYNC_WAITING_INTERVAL = .1
-RECEIVE_TIMEOUT = 1
+COMMAND_SENT_CHECK_TIMEOUT = 10
+COMMAND_RESULT_CHECK_INTERVAL = .01
+COMMAND_TIMEOUT = 2
 CONNECTION_TIMEOUT = 5
+NODE_FIND_LOOP_INTERVAL = .1
 
 
-class TaskForWsRecv:
-    def __init__(self, task_id, timeout: float, *, callback: Callable[[dict], None] = None):
-        self.id = task_id
-        self._callback = callback
+class WsRequestContext:
+
+    def __init__(self, request_id, timeout: float):
+        self.id = request_id
+        self.timeout = timeout
+        self.requested = False
+        self.finished = False
         self._expire = time.perf_counter() + timeout
+        self.exception: Optional[BaseException] = None
 
-    def do_callback(self, data: dict):
-        if self._callback and time.perf_counter() <= self._expire:
-            self._callback(data)
+    @property
+    def done(self):
+        return self.exception or self.finished
+
+    @property
+    def alive(self):
+        return not self.done and time.perf_counter() < self._expire
+
+
+class PageFlag(enum.Flag):
+    NONE = 0x0
+    DOM_ENABLED = 0x1
+
+
+class NodeNotFoundError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class TooMuchNodeError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class CommandException(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
 
 
 class BrowserPage:
@@ -35,46 +67,43 @@ class BrowserPage:
         self.title = kwargs['title']
         self.websocket_url = kwargs['webSocketDebuggerUrl']
 
-        self._ws: WebSocket = None
-        self._ws_thread: Thread = None
-        self._ws_wait_recv_task_list = list[TaskForWsRecv]()
+        self._ws: Optional[WebSocket] = None
+        self.page_flag = PageFlag.NONE
 
-    @property
     def _ensure_ws(self):
         if not self._ws:
             self._ws = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
-        if not self._ws_thread or not self._ws_thread.is_alive():
-            self._ws_thread = Thread(target=self._websocket_callback, name=f'page-{self.title}-ws')
-            self._ws_thread.start()
-        return self._ws
 
-    def _websocket_callback(self):
-        while True:
-            try:
-                self._ws.settimeout(RECEIVE_TIMEOUT)
-                content = self._ws.recv()
-                data = json.loads(content)
-            except WebSocketTimeoutException:
-                continue
-            except WebSocketConnectionClosedException:
-                return
-            except Exception as e:
-                traceback.print_exception(e)
-                return
-            if not isinstance(data, dict):
-                print('Not dict data:', data)
-                return
-            task = self._find_task_by_id(data)
-            if task:
-                self._ws_wait_recv_task_list.remove(task)
-                task.do_callback(data)
-            else:
-                print('No id data:', data)
+    def _recv_response(self, context: WsRequestContext) -> Any:
+        end_time = time.perf_counter() + COMMAND_SENT_CHECK_TIMEOUT
+        while not context.requested and time.perf_counter() < end_time:
+            pass
+        if time.perf_counter() >= end_time:
+            raise TimeoutError(f'Request not sent after {COMMAND_SENT_CHECK_TIMEOUT}s')
 
-    def _find_task_by_id(self, task_id) -> Optional[TaskForWsRecv]:
-        if not task_id:
-            return None
-        return next(filter(lambda t: t.id == task_id, self._ws_wait_recv_task_list), None)
+        end_time = time.perf_counter() + context.timeout
+        try:
+            while context.alive:
+                _start = time.perf_counter()
+                raw = self._recv(end_time - time.perf_counter())
+                if not raw:
+                    continue
+                data = json.loads(raw)
+                if isinstance(data, dict) and data.get('id') == context.id:
+                    if data.get('error'):
+                        context.exception = CommandException(data.get('error'))
+                        return
+                    else:
+                        return data['result']
+            context.exception = TimeoutError(f'requestId: {context.id}, timeout: {context.timeout}')
+        except Exception as e:
+            context.exception = e
+
+    def _recv(self, timeout: float) -> str:
+        self._ensure_ws()
+        self._ws.settimeout(timeout=timeout)
+        content = self._ws.recv()
+        return content
 
     def close(self):
         if self._ws:
@@ -84,34 +113,95 @@ class BrowserPage:
     def activate(self):
         requests.get(f'http://{self.address}/json/activate/{self.id}')
 
-    def go_url(self, url: str, *, activate=False):
-        self._sync_command('Page.navigate', url=url)
+    async def go_url(self, url: str, *, activate=False):
+        await self.command_result('Page.navigate', COMMAND_TIMEOUT, url=url)
         if activate:
             self.activate()
 
-    def _sync_command(self, command: str, **params):
+    async def command_result(self, command: str, timeout: float, **params) -> dict:
         request_id = config.next_id()
-        self._ws_wait_recv_task_list.append(TaskForWsRecv(request_id, 1, callback=lambda data: print('callback', data)))
-        self._ensure_ws.send(json.dumps({
+        context = WsRequestContext(request_id, timeout)
+        future = mythread.submit(lambda: self._recv_response(context))
+        self._ensure_ws()
+        self._ws.send(json.dumps({
             'id': request_id,
             'method': command,
             'params': params
         }))
-        while self._find_task_by_id(request_id):
-            time.sleep(SYNC_WAITING_INTERVAL)
+        context.requested = True
+        while not future.done():
+            await asyncio.sleep(COMMAND_RESULT_CHECK_INTERVAL)
+        if context.exception:
+            raise context.exception
+        return future.result()
 
-    def __eq__(self, other):
-        return isinstance(other, BrowserPage) and self.id == other.id
+    async def _ensure_dom_enabled(self):
+        if PageFlag.DOM_ENABLED & self.page_flag:
+            return
+        await self.command_result('DOM.enable', COMMAND_TIMEOUT)
+        await self.command_result('DOM.getDocument', COMMAND_TIMEOUT)
+
+    async def _query_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
+        await self._ensure_dom_enabled()
+        result: dict = await self.command_result('DOM.performSearch', query=xpath,
+                                                 includeUserAgentShadowDOM=True, timeout=timeout)
+        search_id = result['searchId']
+        try:
+            result_count = result['resultCount']
+            if not result_count:
+                return []
+            result = await self.command_result('DOM.getSearchResults', COMMAND_TIMEOUT,
+                                               searchId=search_id, fromIndex=0, toIndex=result_count)
+            node_ids = result['nodeIds']
+            if not node_ids:
+                return []
+            nodes = list()
+            for i, _id in enumerate(node_ids):
+                result = await self.command_result('DOM.describeNode', COMMAND_TIMEOUT,
+                                                   nodeId=_id)
+                nodes.append(PageNode(self, f'{xpath}[{i}]', **result['node']))
+            return nodes
+        finally:
+            await self.command_result('DOM.discardSearchResults', COMMAND_TIMEOUT,
+                                      searchId=search_id)
+
+    async def query_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
+        nodes = list()
+        end_time = time.perf_counter() + timeout
+        while not nodes and time.perf_counter() < end_time:
+            nodes = await self.query_nodes_by_xpath(xpath, end_time - time.perf_counter())
+            await asyncio.sleep(NODE_FIND_LOOP_INTERVAL)
+        return nodes
+
+    async def query_single_node_by_xpath(self, xpath: str, timeout: float) -> Optional[PageNode]:
+        nodes = await self._query_nodes_by_xpath(xpath, timeout)
+        if len(nodes) > 1:
+            raise TooMuchNodeError(f'xpath: {xpath}, len: {len(nodes)}')
+        return nodes[0]
+
+    async def require_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
+        nodes = await self.query_nodes_by_xpath(xpath, timeout)
+        if not nodes:
+            raise NodeNotFoundError(f'xpath={xpath}, timeout={timeout}')
+        return nodes
+
+    async def require_single_node_by_xpath(self, xpath: str, timeout: float) -> PageNode:
+        node = await self.query_single_node_by_xpath(xpath, timeout)
+        if not node:
+            raise NodeNotFoundError(f'xpath={xpath}, timeout={timeout}')
+        return node
+
+    async def run_js(self, expression: str, timeout: float):
+        return await self.command_result('Runtime.evaluate', timeout,
+                                         expression=expression)
+
+    def __del__(self):
+        if self._ws:
+            self._ws.close()
 
 
 def main():
-    import json
-
-    page_data = json.loads(requests.get('http://localhost:9100/json').text)
-    page_data = [x for x in page_data if x['type'] == 'page']
-    page = BrowserPage('localhost:9100', **page_data[1])
-    print(page.url)
-    page.go_url('http://baidu.com')
+    pass
 
 
 if __name__ == '__main__':

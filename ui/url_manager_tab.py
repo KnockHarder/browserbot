@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import os
@@ -220,7 +221,7 @@ class UrlTableView(QTableView):
     def go_cell_url(self, index: QModelIndex):
         url = index.data(UrlTableItemModel.LINK_ITEM_ROLE)
         if url:
-            self.browser.to_page_or_open_url(url, activate=True)
+            asyncio.create_task(self.browser.find_or_open(url, activate=True), name='Open Url')
 
     def rowsAboutToBeRemoved(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int) -> None:
         for row in range(start, end + 1):
@@ -247,7 +248,7 @@ class UrlTableView(QTableView):
         for idx in indexes:
             url = idx.data(UrlTableItemModel.LINK_ITEM_ROLE)
             if url:
-                self.browser.to_page_or_open_url(url, activate=True)
+                asyncio.create_task(self.browser.find_or_open(url, activate=True), name='Open Selected')
 
 
 class UrlTableItemModel(QAbstractItemModel):

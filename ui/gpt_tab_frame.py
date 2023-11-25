@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import os.path
 import sys
-from typing import Optional
+from typing import Optional, Coroutine
 
 from PySide6.QtCore import Slot, Signal, Qt
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -11,9 +11,8 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QApp
 from jinja2 import TemplateError
 from langchain.prompts import load_prompt, PromptTemplate
 
-from browser import get_browser
 from config import gpt_prompt_file_dir
-from gpt import gpt_util
+from gpt import ChatGptPage
 from gpt.prompt import parse_template
 
 
@@ -37,12 +36,11 @@ class GptTabFrame(QFrame):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self.chat_page = ChatGptPage()
 
         from ui.gpt_tab_frame_uic import Ui_GptTabFrame
         self.ui = Ui_GptTabFrame()
         self.ui.setupUi(self)
-
-        self.browser = get_browser()
         self.template_file = None
         self.init_prompt_inputs()
         self.task_info_list = list()
@@ -79,11 +77,19 @@ class GptTabFrame(QFrame):
 
     @Slot()
     def new_chat(self):
-        gpt_util.start_new_chat(self.browser, True)
+        async def _do_async():
+            await self.chat_page.new_chat()
+            await self.chat_page.activate()
+
+        self._create_task(_do_async(), 'New Chat')
+
+    @staticmethod
+    def _create_task(coro: Coroutine, name: str):
+        asyncio.create_task(coro, name=name)
 
     @Slot()
     def clear_chat_history(self):
-        gpt_util.clear_chat_history(self.browser)
+        asyncio.create_task(self.chat_page.clear_histories(), name='clear history')
 
     @Slot()
     def load_template_for_chat(self):
@@ -170,7 +176,7 @@ class GptTabFrame(QFrame):
         async def async_gen_code():
             submit_btn.setEnabled(False)
             self.statusLabelTextReset.emit('正在生成代码...')
-            answer = await gpt_util.gen_code_question(self.browser, prompt, **param_map)
+            answer = await self.chat_page.gen_code_question(prompt, **param_map)
             self.answerTextReset.emit(answer)
             self.statusLabelTextReset.emit('生成成功!')
             self.activate_window()
