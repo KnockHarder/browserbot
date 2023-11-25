@@ -1,4 +1,5 @@
 import enum
+import json
 from typing import Any, Optional
 
 from bs4 import BeautifulSoup
@@ -64,7 +65,8 @@ class PageNode:
     @property
     async def outer_html(self) -> str:
         if self._outer_html is None:
-            result = await self.page.command_result('DOM.getOuterHTML', backendNodeId=self.backend_id)
+            result = await self.page.command_result('DOM.getOuterHTML', COMMAND_TIMEOUT,
+                                                    backendNodeId=self.backend_id)
             self._outer_html = result['outerHTML']
         return self._outer_html
 
@@ -102,15 +104,16 @@ class PageNode:
                                               functionDeclaration=js, objectId=await self.object_id)
 
     async def submit_input(self, content: str):
-        if self.name != 'input':
+        if self.name not in ['input', 'textarea']:
             raise JsExecuteException(self.backend_id, 'Not a text input', self.name)
         await self._call_function_on(f'''function () {{
+                    this.value = {json.dumps(content[:-1], ensure_ascii=False)}
                     this.focus()
-                    this.value = ""
                 }}''')
-        for c in content:
+        if content:
+            ch = content[-1]
             await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
-                                           type='char', text=c, key=c, code=f"Key{c.upper()}")
+                                           type='char', text=ch, key=ch, code=f"Key{ch.upper()}")
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
                                        type='keyDown', key='Enter', code='Enter')
 

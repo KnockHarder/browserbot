@@ -32,7 +32,7 @@ class AsyncResult:
     @classmethod
     def wait_all_done(cls, cor_list: Iterable[Coroutine]):
         for cor in cor_list:
-            AsyncResult(cor).wait()
+            AsyncResult.wait_done(cor)
 
     @classmethod
     def get_result(cls, cor: Coroutine[Any, Any, T]) -> T:

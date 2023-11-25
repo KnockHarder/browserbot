@@ -80,7 +80,7 @@ class BrowserPage:
         while not context.requested and time.perf_counter() < end_time:
             pass
         if time.perf_counter() >= end_time:
-            raise TimeoutError(f'Request not sent after {COMMAND_SENT_CHECK_TIMEOUT}s')
+            raise TimeoutError(f'Request not sent after {COMMAND_SENT_CHECK_TIMEOUT}s', context.params)
 
         end_time = time.perf_counter() + context.timeout
         try:
@@ -96,7 +96,7 @@ class BrowserPage:
                         return
                     else:
                         return data['result']
-            context.exception = TimeoutError(f'requestId: {context.id}, timeout: {context.timeout}')
+            context.exception = TimeoutError(f'Timeout: {context.timeout}', context.params)
         except Exception as e:
             context.exception = e
 
@@ -174,7 +174,10 @@ class BrowserPage:
         nodes = list()
         end_time = time.perf_counter() + timeout
         while not nodes and time.perf_counter() < end_time:
-            nodes = await self._query_by_xpath(xpath, end_time - time.perf_counter())
+            try:
+                nodes = await self._query_by_xpath(xpath, end_time - time.perf_counter())
+            except TimeoutError:
+                return []
             await asyncio.sleep(NODE_FIND_LOOP_INTERVAL)
         return nodes
 

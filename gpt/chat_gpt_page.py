@@ -34,7 +34,7 @@ class ChatGptPage:
         return await page.require_single_node_by_xpath(xpath, FIND_NODE_TIMEOUT)
 
     async def new_chat(self):
-        node = await self._query_single_d('//span//button[contains(@class, "text-token-text-primary")][last()]')
+        node = await self._query_single_d('(//span//button[contains(@class, "text-token-text-primary")])[last()]')
         await node.js_click()
 
     async def ask_as_new_chat(self, ques: str):
@@ -91,8 +91,8 @@ class ChatGptPage:
 
     @staticmethod
     def is_finished(message_node: PageNode):
-        return (message_node.pseudo_type == NodePseudoType.BEFORE
-                or message_node.pseudo_type == NodePseudoType.AFTER)
+        print(message_node.pseudo_type)
+        return message_node.pseudo_type not in [NodePseudoType.BEFORE, NodePseudoType.AFTER]
 
     async def clear_histories(self):
         page = await self.ensure_page()

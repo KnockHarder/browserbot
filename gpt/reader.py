@@ -1,5 +1,5 @@
 import os.path
-from typing import Callable, Coroutine
+from typing import Callable, Coroutine, Any
 
 from bs4 import BeautifulSoup
 from langchain import prompts
@@ -76,12 +76,12 @@ async def read_weixin_article(page: BrowserPage) -> Article:
     content_ele = await page.require_single_node_by_xpath('//*[@id="js_content"][1]', ARTICLE_READ_TIMEOUT)
     section = await get_paragraphs_text(content_ele, 'section')
     p = await get_paragraphs_text(content_ele, 'p')
-    title_node = await page.require_single_node_by_xpath('h1[0]', ARTICLE_READ_TIMEOUT)
+    title_node = await page.require_single_node_by_xpath('//h1[1]', ARTICLE_READ_TIMEOUT)
     return Article(await title_node.text_content, p if len(p) > len(section) else section)
 
 
 async def read_all_page_articles(gpt_page: ChatGptPage, article_url_prefix,
-                                 article_content_func: Callable[[BrowserPage], Coroutine[Article]]):
+                                 article_content_func: Callable[[BrowserPage], Coroutine[Any, Any, Article]]):
     browser = get_browser()
     page_list = browser.find_pages_by_url_prefix(article_url_prefix)
     if not page_list:
