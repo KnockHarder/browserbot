@@ -15,7 +15,7 @@ ARTICLE_READ_TIMEOUT = 5
 
 class Article:
     def __init__(self, title: str, plain_content: str, url: str = None):
-        self.name = title
+        self.name = title.strip()
         self.content = plain_content
         self.url = url
 
@@ -65,7 +65,7 @@ async def summarize_article(gpt_page: ChatGptPage, article: Article):
 
 
 async def read_info_q_article(page: BrowserPage) -> Article:
-    title_node = await page.require_single_node_by_xpath('//h1[1]', ARTICLE_READ_TIMEOUT)
+    title_node = await page.require_single_node_by_xpath('(//h1)[1]', ARTICLE_READ_TIMEOUT)
     content_node = await page.require_single_node_by_xpath(
         '//*[@class="content-main"]//*[@class="article-preview"][1]', ARTICLE_READ_TIMEOUT)
     return Article(await title_node.text_content,

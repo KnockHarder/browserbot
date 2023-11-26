@@ -1,6 +1,5 @@
 import enum
-import json
-from typing import Any, Optional
+from typing import Any, Optional, Iterable
 
 from bs4 import BeautifulSoup
 
@@ -10,6 +9,10 @@ COMMAND_TIMEOUT = 1
 class NodePseudoType(enum.Enum):
     BEFORE = 'before'
     AFTER = 'after'
+
+    @staticmethod
+    def by_str(value: str) -> Optional["NodePseudoType"]:
+        return next(filter(lambda x: x.value == value, NodePseudoType), None)
 
 
 class JsExecuteException(Exception):
@@ -38,6 +41,8 @@ class PageNode:
         flatter_attrs: list[str] = kwargs['attributes']
         self._attributes = {flatter_attrs[i]: flatter_attrs[i + 1] for i in range(0, len(flatter_attrs), 2)}
         self._pseudo_type = kwargs.get('pseudoType')
+        nodes_data = kwargs.get('pseudoElements')
+        self.pseudo_nodes = [PageNode(self.page, '', **data) for data in (nodes_data if nodes_data else [])]
         self._outer_html = None
         self._object = None
 
@@ -60,7 +65,7 @@ class PageNode:
 
     @property
     def pseudo_type(self) -> Optional[NodePseudoType]:
-        return next(filter(lambda x: x.value == self._pseudo_type, NodePseudoType), None)
+        return NodePseudoType.by_str(self._pseudo_type)
 
     @property
     async def outer_html(self) -> str:
@@ -104,16 +109,10 @@ class PageNode:
                                               functionDeclaration=js, objectId=await self.object_id)
 
     async def submit_input(self, content: str):
-        if self.name not in ['input', 'textarea']:
-            raise JsExecuteException(self.backend_id, 'Not a text input', self.name)
-        await self._call_function_on(f'''function () {{
-                    this.value = {json.dumps(content[:-1], ensure_ascii=False)}
-                    this.focus()
-                }}''')
-        if content:
-            ch = content[-1]
-            await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
-                                           type='char', text=ch, key=ch, code=f"Key{ch.upper()}")
+        await self.page.command_result('DOM.focus', COMMAND_TIMEOUT,
+                                       backendNodeId=self.backend_id)
+        await self.page.command_result('Input.insertText', COMMAND_TIMEOUT,
+                                       text=content)
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
                                        type='keyDown', key='Enter', code='Enter')
 

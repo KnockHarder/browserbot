@@ -4,8 +4,8 @@ from typing import Any, Optional
 from langchain.prompts import BasePromptTemplate
 
 from browser import Browser, get_browser
-from browser_dom import PageNode, NodePseudoType
-from browser_page import BrowserPage
+from browser_dom import PageNode
+from browser_page import BrowserPage, CommandException
 
 HOME_PAGE = 'https://chat.openai.com'
 FIND_NODE_TIMEOUT = 2
@@ -69,8 +69,8 @@ class ChatGptPage:
 
     async def _wait_answer_done(self, before_ask_size=0) -> list[PageNode]:
         main_ele = await self._query_single_d('//div[@id="__next"]//main[1]')
-        chats = []
         page = await self.ensure_page()
+        chats = []
         while (not chats
                or len(chats) < before_ask_size + 2
                or not (await self.is_answer_finished(chats[-1]))):
@@ -82,17 +82,23 @@ class ChatGptPage:
     async def is_answer_finished(self, chat: PageNode):
         if not await chat.text_content:
             return False
-        contents = []
+        content_nodes = list[PageNode]()
         page = await self.ensure_page()
-        contents += await page.query_nodes_by_xpath(f'{chat.x_path}//p', FIND_NODE_TIMEOUT)
-        contents += await page.query_nodes_by_xpath(f'{chat.x_path}//li', FIND_NODE_TIMEOUT)
-        contents += await page.query_nodes_by_xpath(f'{chat.x_path}//code', FIND_NODE_TIMEOUT)
-        return contents and all(self.is_finished(x) for x in contents)
-
-    @staticmethod
-    def is_finished(message_node: PageNode):
-        print(message_node.pseudo_type)
-        return message_node.pseudo_type not in [NodePseudoType.BEFORE, NodePseudoType.AFTER]
+        content_nodes += await page.query_nodes_by_xpath(f'{chat.x_path}//p', 0)
+        content_nodes += await page.query_nodes_by_xpath(f'{chat.x_path}//li', 0)
+        content_nodes += await page.query_nodes_by_xpath(f'{chat.x_path}//code', 0)
+        if not content_nodes:
+            return False
+        any_pseudo_text = False
+        for node, pseudo_node in [(node, pseudo_node) for node in content_nodes for pseudo_node in node.pseudo_nodes]:
+            try:
+                text = await pseudo_node.text_content
+                if text:
+                    any_pseudo_text = True
+                    break
+            except CommandException:
+                pass
+        return not any_pseudo_text
 
     async def clear_histories(self):
         page = await self.ensure_page()

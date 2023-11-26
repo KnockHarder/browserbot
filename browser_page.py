@@ -26,17 +26,12 @@ class WsRequestContext:
         self.timeout = timeout
         self.params = params
         self.requested = False
-        self.finished = False
         self._expire = time.perf_counter() + timeout
         self.exception: Optional[BaseException] = None
 
     @property
-    def done(self):
-        return self.exception or self.finished
-
-    @property
     def alive(self):
-        return not self.done and time.perf_counter() < self._expire
+        return not self.exception and time.perf_counter() < self._expire
 
 
 class PageFlag(enum.Flag):
@@ -84,27 +79,24 @@ class BrowserPage:
 
         end_time = time.perf_counter() + context.timeout
         try:
-            while context.alive:
-                _start = time.perf_counter()
+            while True:
                 raw = self._recv(end_time - time.perf_counter())
-                if not raw:
-                    continue
                 data = json.loads(raw)
                 if isinstance(data, dict) and data.get('id') == context.id:
                     if data.get('error'):
                         context.exception = CommandException(data.get('error'), context.params)
                         return
-                    else:
-                        return data['result']
-            context.exception = TimeoutError(f'Timeout: {context.timeout}', context.params)
+                    return data['result']
+                if not context.alive:
+                    raise TimeoutError(f'Timeout: {context.timeout}', context.params)
         except Exception as e:
             context.exception = e
 
     def _recv(self, timeout: float) -> str:
         self._ensure_ws()
+        timeout = max(0., timeout)
         self._ws.settimeout(timeout=timeout)
-        content = self._ws.recv()
-        return content
+        return self._ws.recv()
 
     def close(self):
         if self._ws:
@@ -171,15 +163,15 @@ class BrowserPage:
                                       searchId=search_id)
 
     async def query_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
-        nodes = list()
         end_time = time.perf_counter() + timeout
-        while not nodes and time.perf_counter() < end_time:
+        while True:
             try:
                 nodes = await self._query_by_xpath(xpath, end_time - time.perf_counter())
             except TimeoutError:
                 return []
+            if nodes or time.perf_counter() > end_time:
+                return nodes
             await asyncio.sleep(NODE_FIND_LOOP_INTERVAL)
-        return nodes
 
     async def query_single_node_by_xpath(self, xpath: str, timeout: float) -> Optional[PageNode]:
         nodes = await self.query_nodes_by_xpath(xpath, timeout)
