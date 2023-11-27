@@ -1,3 +1,4 @@
+import asyncio
 import os.path
 from typing import Callable, Coroutine, Any
 
@@ -99,14 +100,14 @@ async def read_all_page_articles(gpt_page: ChatGptPage, article_url_prefix,
 
 
 def main():
-    from mythread import AsyncResult
+    async def _do():
+        await read_all_page_articles(page, 'https://mp.weixin.qq.com/s/', read_weixin_article)
+        await read_all_page_articles(page, 'https://mp.weixin.qq.com/s?', read_weixin_article)
+        await read_all_page_articles(page, 'https://www.infoq.cn/article', read_info_q_article)
+        await read_all_page_articles(page, 'https://www.infoq.cn/news/', read_info_q_article)
+
     page = ChatGptPage()
-    AsyncResult.wait_all_done([
-        read_all_page_articles(page, 'https://mp.weixin.qq.com/s/', read_weixin_article),
-        read_all_page_articles(page, 'https://mp.weixin.qq.com/s?', read_weixin_article),
-        read_all_page_articles(page, 'https://www.infoq.cn/article', read_info_q_article),
-        read_all_page_articles(page, 'https://www.infoq.cn/news/', read_info_q_article)
-    ])
+    asyncio.get_event_loop().run_until_complete(_do())
 
 
 if __name__ == '__main__':

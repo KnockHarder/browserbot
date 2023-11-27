@@ -117,9 +117,8 @@ class ChatGptPage:
 
 
 def main():
-    from mythread import AsyncResult
     page = ChatGptPage()
-    AsyncResult.wait_done(page.clear_histories())
+    asyncio.get_event_loop().run_until_complete(page.clear_histories())
 
 
 if __name__ == '__main__':

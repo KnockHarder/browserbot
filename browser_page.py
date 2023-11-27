@@ -9,7 +9,6 @@ import websocket
 from websocket import WebSocket
 
 import config
-import mythread
 from browser_dom import PageNode
 
 COMMAND_SENT_CHECK_TIMEOUT = 10
@@ -70,28 +69,6 @@ class BrowserPage:
         if not self._ws:
             self._ws = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
 
-    def _recv_response(self, context: WsRequestContext) -> Any:
-        end_time = time.perf_counter() + COMMAND_SENT_CHECK_TIMEOUT
-        while not context.requested and time.perf_counter() < end_time:
-            pass
-        if time.perf_counter() >= end_time:
-            raise TimeoutError(f'Request not sent after {COMMAND_SENT_CHECK_TIMEOUT}s', context.params)
-
-        end_time = time.perf_counter() + context.timeout
-        try:
-            while True:
-                raw = self._recv(end_time - time.perf_counter())
-                data = json.loads(raw)
-                if isinstance(data, dict) and data.get('id') == context.id:
-                    if data.get('error'):
-                        context.exception = CommandException(data.get('error'), context.params)
-                        return
-                    return data['result']
-                if not context.alive:
-                    raise TimeoutError(f'Timeout: {context.timeout}', context.params)
-        except Exception as e:
-            context.exception = e
-
     def _recv(self, timeout: float) -> str:
         self._ensure_ws()
         timeout = max(0., timeout)
@@ -113,8 +90,6 @@ class BrowserPage:
 
     async def command_result(self, command: str, timeout: float, **params) -> dict:
         request_id = config.next_id()
-        context = WsRequestContext(request_id, timeout, params)
-        future = mythread.submit(lambda: self._recv_response(context))
         self._ensure_ws()
         request = {
             'id': request_id,
@@ -122,12 +97,22 @@ class BrowserPage:
             'params': params
         }
         self._ws.send(json.dumps(request))
-        context.requested = True
-        while not future.done():
-            await asyncio.sleep(COMMAND_RESULT_CHECK_INTERVAL)
-        if context.exception:
-            raise context.exception
-        return future.result()
+        return await self._wait_response(request_id, timeout, params)
+
+    async def _wait_response(self, request_id: int, timeout: float, params: dict) -> Any:
+        end_time = time.perf_counter() + timeout
+        while True:
+            try:
+                raw = self._recv(end_time - time.perf_counter())
+                data = json.loads(raw)
+                if isinstance(data, dict) and data.get('id') == request_id:
+                    if data.get('error'):
+                        raise CommandException(data.get('error'), params)
+                    return data['result']
+            except BlockingIOError:
+                pass
+            if end_time < time.perf_counter():
+                raise TimeoutError(f'Timeout: {timeout}', params)
 
     async def _ensure_dom_enabled(self):
         if PageFlag.DOM_ENABLED & self.page_flag:
