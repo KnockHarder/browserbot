@@ -49,21 +49,21 @@ class Browser:
         return max(filter(lambda x: domain in x.url, self.pages),
                    default=None, key=lambda y: len(y.url))
 
-    async def find_or_open(self, url: str, activate=False, timeout=FIND_INTERVAL) -> BrowserPage:
-        page = self.find_page_by_url_prefix(url)
+    async def find_or_open(self, prefix: str, activate=False, timeout=FIND_INTERVAL) -> BrowserPage:
+        page = self.find_page_by_url_prefix(prefix)
         if page:
             if activate:
                 page.activate()
             return page
         old_pages = self.pages
-        requests.put(f'http://{self.address}/json/new?{quote(url)}')
+        requests.put(f'http://{self.address}/json/new?{quote(prefix)}')
         end_time = time.perf_counter() + timeout
         while len(old_pages) == len(self.pages) and time.perf_counter() < end_time:
             await asyncio.sleep(FIND_INTERVAL)
         old_ids = {x.id for x in old_pages}
         new_tab = next(iter([x for x in self.pages if x.id not in old_ids]), None)
         if not new_tab:
-            raise TabNotFoundError('new tab', f'url={url}')
+            raise TabNotFoundError('new tab', f'url={prefix}')
         return new_tab
 
 

@@ -67,7 +67,8 @@ class BrowserPage:
 
     def _ensure_ws(self):
         if not self._ws:
-            self._ws = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
+            self._ws: WebSocket = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
+            self._ws.ping()
 
     def _recv(self, timeout: float) -> str:
         self._ensure_ws()

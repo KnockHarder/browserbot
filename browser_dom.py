@@ -1,5 +1,5 @@
 import enum
-from typing import Any, Optional, Iterable
+from typing import Any, Optional
 
 from bs4 import BeautifulSoup
 
@@ -35,32 +35,40 @@ class PageNode:
         self.backend_id: int = kwargs['backendNodeId']
         self._update_node_info(kwargs)
 
-    def _update_node_info(self, kwargs):
-        self.name = kwargs['localName']
-        self.child_count = kwargs['childNodeCount']
-        flatter_attrs: list[str] = kwargs['attributes']
+    def _update_node_info(self, node_result: dict):
+        self.name = node_result['localName']
+        self.child_count = node_result['childNodeCount']
+        flatter_attrs: list[str] = node_result['attributes']
         self._attributes = {flatter_attrs[i]: flatter_attrs[i + 1] for i in range(0, len(flatter_attrs), 2)}
-        self._pseudo_type = kwargs.get('pseudoType')
-        nodes_data = kwargs.get('pseudoElements')
+        self._pseudo_type = node_result.get('pseudoType')
+        nodes_data = node_result.get('pseudoElements')
         self.pseudo_nodes = [PageNode(self.page, '', **data) for data in (nodes_data if nodes_data else [])]
         self._outer_html = None
         self._object = None
 
     async def update_node(self):
-        await self.page.command_result('DOM.')
-        result = await self.page.command_result('DOM.describeNode', COMMAND_TIMEOUT,
-                                                backendNodeId=self.backend_id)
-        self._update_node_info(**result['node'])
+        result = await self.describe_node()
+        self._update_node_info(result['node'])
+
+    async def describe_node(self):
+        return await self.page.command_result('DOM.describeNode', COMMAND_TIMEOUT,
+                                              backendNodeId=self.backend_id)
 
     def prop_value(self, name: str) -> Any:
         return self._attributes.get(name)
 
+    def has_prop(self, name):
+        return name in self._attributes
+
     async def set_props(self, kv_dict: Optional[dict] = None, **kwargs):
         kv_dict = dict(**kv_dict) if kv_dict else dict()
         kv_dict.update(kwargs)
-        for name, value in kv_dict:
+        result = await self.page.command_result('DOM.pushNodesByBackendIdsToFrontend', COMMAND_TIMEOUT,
+                                                backendNodeIds=[self.backend_id])
+        node_id = result['nodeIds'][0]
+        for name, value in kv_dict.items():
             await self.page.command_result('DOM.setAttributeValue', COMMAND_TIMEOUT,
-                                           nodeId=self.id, name=name, value=value)
+                                           nodeId=node_id, name=name, value=value)
         await self.update_node()
 
     @property
@@ -114,7 +122,8 @@ class PageNode:
         await self.page.command_result('Input.insertText', COMMAND_TIMEOUT,
                                        text=content)
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
-                                       type='keyDown', key='Enter', code='Enter')
+                                       type='keyDown', key='Enter', code='Enter',
+                                       nativeVirtualKeyCode=13, windowsVirtualKeyCode=13)
 
 
 if __name__ == '__main__':
