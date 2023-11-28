@@ -119,6 +119,7 @@ class PageNode:
     async def submit_input(self, content: str):
         await self.page.command_result('DOM.focus', COMMAND_TIMEOUT,
                                        backendNodeId=self.backend_id)
+        await self._call_function_on('function() {this.value = ""}')
         await self.page.command_result('Input.insertText', COMMAND_TIMEOUT,
                                        text=content)
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
