@@ -58,7 +58,7 @@ class BrowserPage:
     def __init__(self, web_tool_addr: str, **kwargs):
         self.address = web_tool_addr
         self.id = kwargs['id']
-        self.url = kwargs['url']
+        self.url: str = kwargs['url']
         self.title = kwargs['title']
         self.websocket_url = kwargs['webSocketDebuggerUrl']
 
@@ -136,7 +136,7 @@ class BrowserPage:
             if not node_ids:
                 return []
             data_list = list()
-            for _id in node_ids:
+            for _id in [x for x in node_ids if x > 0]:
                 result = await self.command_result('DOM.describeNode', COMMAND_TIMEOUT,
                                                    nodeId=_id)
                 data_list.append(result['node'])
