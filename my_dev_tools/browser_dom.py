@@ -102,8 +102,7 @@ class PageNode:
             raise JsExecuteException(e)
 
     async def left_click(self):
-        await self.page.command_result('DOM.scrollIntoViewIfNeeded', COMMAND_TIMEOUT,
-                                       backendNodeId=self.backend_id)
+        await self.scroll_into_view()
         result = await self.page.command_result('DOM.getContentQuads', COMMAND_TIMEOUT,
                                                 backendNodeId=self.backend_id)
         x1, y1, x2, _, _, y2, _, _ = tuple(result['quads'][0])
@@ -125,6 +124,10 @@ class PageNode:
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
                                        type='keyDown', key='Enter', code='Enter',
                                        nativeVirtualKeyCode=13, windowsVirtualKeyCode=13)
+
+    async def scroll_into_view(self):
+        await self.page.command_result('DOM.scrollIntoViewIfNeeded', COMMAND_TIMEOUT,
+                                       backendNodeId=self.backend_id)
 
 
 if __name__ == '__main__':

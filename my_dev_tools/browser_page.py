@@ -13,6 +13,7 @@ from .browser_dom import PageNode
 
 COMMAND_SENT_CHECK_TIMEOUT = 10
 COMMAND_RESULT_CHECK_INTERVAL = .01
+MIN_RECEIVE_TIMEOUT = .05
 COMMAND_TIMEOUT = 2
 CONNECTION_TIMEOUT = 5
 NODE_FIND_LOOP_INTERVAL = .1
@@ -72,7 +73,7 @@ class BrowserPage:
 
     def _recv(self, timeout: float) -> str:
         self._ensure_ws()
-        timeout = max(0., timeout)
+        timeout = max(MIN_RECEIVE_TIMEOUT, timeout)
         self._ws.settimeout(timeout=timeout)
         return self._ws.recv()
 
