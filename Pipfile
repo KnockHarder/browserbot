@@ -11,6 +11,8 @@ pyside6 = "6.6"
 py2app = "*"
 transformers = "*"
 jsonpath = "*"
+requests = "*"
+websocket-client = "*"
 
 [dev-packages]
 
