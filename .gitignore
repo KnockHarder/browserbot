@@ -8,5 +8,3 @@
 __pycache__
 /*.egg-info/
 /build/
-/requirements.txt
-*.*-e

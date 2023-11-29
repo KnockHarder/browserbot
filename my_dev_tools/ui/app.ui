@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>617</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>工作助手</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QListWidget" name="tab_name_list_widget">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>100</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>100</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QListWidget {
+	font: bold 18pt &quot;Kaiti SC&quot;;
+	background-color: rgba(56, 125, 245, 150);
+}
+
+QListWidget::item {
+    color: white;
+    padding: 10px 0;
+    text-align: center;
+}
+
+QListWidget::item:selected:!active {
+	background-color: rgb(33, 74, 207);
+}
+</string>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::Panel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <property name="lineWidth">
+       <number>0</number>
+      </property>
+      <property name="currentRow">
+       <number>-1</number>
+      </property>
+      <item>
+       <property name="text">
+        <string>GPT助手</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>链接管理</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>JSON工具</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item>
+     <widget class="MainTabWidget" name="main_tab_widget">
+      <property name="styleSheet">
+       <string notr="true">#main_tab_widget::tab-bar {
+	height: 0;
+}
+#main_tab_widget::pane {
+	border: none;
+	spacing: 0;
+	margin: -25px 0 -20px -20px;
+}</string>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <property name="usesScrollButtons">
+       <bool>false</bool>
+      </property>
+      <property name="documentMode">
+       <bool>true</bool>
+      </property>
+      <property name="tabsClosable">
+       <bool>false</bool>
+      </property>
+      <property name="movable">
+       <bool>false</bool>
+      </property>
+      <property name="tabBarAutoHide">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>GPT肋手</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <widget class="GptTabFrame" name="frame">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="autoFillBackground">
+           <bool>false</bool>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QFame {
+	border: none;
+}</string>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::NoFrame</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Raised</enum>
+          </property>
+          <property name="lineWidth">
+           <number>1</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_2">
+       <attribute name="title">
+        <string>链接管理</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="UrlManagerTabFrame" name="frame_2">
+          <property name="frameShape">
+           <enum>QFrame::NoFrame</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Raised</enum>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_3">
+       <attribute name="title">
+        <string>JSON工具</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <widget class="JsonToolFrame" name="frame_4">
+          <property name="frameShape">
+           <enum>QFrame::NoFrame</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Plain</enum>
+          </property>
+          <property name="lineWidth">
+           <number>0</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1000</width>
+     <height>37</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MainTabWidget</class>
+   <extends>QTabWidget</extends>
+   <header>.app.h</header>
+   <container>1</container>
+   <slots>
+    <slot>switch_tab(QModelIndex)</slot>
+   </slots>
+  </customwidget>
+  <customwidget>
+   <class>GptTabFrame</class>
+   <extends>QFrame</extends>
+   <header>.gpt_tab_frame.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>UrlManagerTabFrame</class>
+   <extends>QFrame</extends>
+   <header>.url_manager_tab.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>JsonToolFrame</class>
+   <extends>QFrame</extends>
+   <header location="global">.json_tool_frame.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>tab_name_list_widget</sender>
+   <signal>clicked(QModelIndex)</signal>
+   <receiver>main_tab_widget</receiver>
+   <slot>switch_tab(QModelIndex)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>77</x>
+     <y>265</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>341</x>
+     <y>265</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>tab_name_list_widget</sender>
+   <signal>currentRowChanged(int)</signal>
+   <receiver>main_tab_widget</receiver>
+   <slot>setCurrentIndex(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>55</x>
+     <y>152</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>184</x>
+     <y>35</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
