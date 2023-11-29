@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="tableRow">
+    <file>resources/add.svg</file>
+  </qresource>
+  <qresource prefix="rowOperator">
+    <file>resources/delete.svg</file>
+  </qresource>
+</RCC>

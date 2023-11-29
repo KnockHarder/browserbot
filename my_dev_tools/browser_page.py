@@ -8,8 +8,8 @@ import requests
 import websocket
 from websocket import WebSocket
 
-import config
-from browser_dom import PageNode
+from . import config
+from .browser_dom import PageNode
 
 COMMAND_SENT_CHECK_TIMEOUT = 10
 COMMAND_RESULT_CHECK_INTERVAL = .01

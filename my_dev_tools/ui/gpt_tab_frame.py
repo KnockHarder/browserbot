@@ -11,9 +11,9 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QPlainTextEdit, QApp
 from jinja2 import TemplateError
 from langchain.prompts import load_prompt, PromptTemplate
 
-from config import gpt_prompt_file_dir
-from gpt import ChatGptPage
-from gpt.prompt import parse_template
+from ..config import gpt_prompt_file_dir
+from ..gpt import ChatGptPage
+from ..gpt import parse_template
 
 
 def safe_parse_template(parent: QWidget, template: str) -> Optional[PromptTemplate]:
@@ -38,7 +38,7 @@ class GptTabFrame(QFrame):
         super().__init__(parent)
         self.chat_page = ChatGptPage()
 
-        from ui.gpt_tab_frame_uic import Ui_GptTabFrame
+        from ..ui.gpt_tab_frame_uic import Ui_GptTabFrame
         self.ui = Ui_GptTabFrame()
         self.ui.setupUi(self)
         self.template_file = None

@@ -15,7 +15,7 @@ from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QMenu, \
     QInputDialog, QLineEdit, QPushButton
 
-import mywidgets.dialog as my_dialog
+from ..widgets import dialog as my_dialog
 
 JSON_ROOT_PATH = '$'
 
@@ -46,7 +46,7 @@ class JsonToolFrame(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        from ui.json_tool_frame_uic import Ui_JsonToolFrame
+        from ..ui.json_tool_frame_uic import Ui_JsonToolFrame
         self.ui = Ui_JsonToolFrame()
         self.ui.setupUi(self)
 
@@ -121,7 +121,7 @@ class JsonViewerFrame(QFrame):
                  data_func: Callable[[], Any] = None):
         super().__init__(parent)
 
-        from ui.json_viewer_frame_uic import Ui_JsonViewerFrame
+        from ..ui.json_viewer_frame_uic import Ui_JsonViewerFrame
         self.ui = Ui_JsonViewerFrame()
         self.ui.setupUi(self)
 

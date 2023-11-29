@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import requests
 
-from browser_page import BrowserPage
+from .browser_page import BrowserPage
 
 FIND_INTERVAL = .1
 TIMEOUT = 5.

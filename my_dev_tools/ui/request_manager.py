@@ -321,6 +321,51 @@ class ConstRequestItems:
             return ConstRows.ResponseRow.BODY, 0, ConstRequestItems.ResponseItem(self.req, self.resp)
 
 
+class JsonLevelItem(AbstractRequestItem):
+    def __init__(self, data: Any, parent_row: int, parent_item: AbstractRequestItem):
+        self.data = data
+        self.parent_row = parent_row
+        self.parent_item = parent_item
+        self.children = []
+
+    def data(self, index: QModelIndex, role=-1) -> Any:
+        if role in [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]:
+            return self.display_data(index)
+
+    def display_data(self, index: QModelIndex) -> Any:
+        data = self.row_data(index.row())
+        if isinstance(data, tuple):
+            k, v = data
+            v = '' if isinstance(v, (list, dict)) or not v else str(v)
+            return (k, v)[index.column()]
+        if data:
+            return (str(data), '')[index.column()]
+        return None
+
+    def row_data(self, row: int) -> Any:
+        if isinstance(self.data, dict):
+            key_list = sorted(list(self.data.keys()))
+            return key_list[row], self.data[key_list[row]]
+        elif isinstance(self.data, list):
+            return self.data[row]
+        return None
+
+    def child_sub_row_count(self, child: QModelIndex) -> int:
+        data = self.row_data(child.row())
+        if isinstance(data, tuple):
+            _, data = data
+        if isinstance(data, (dict, list)):
+            return len(data)
+        return 0
+
+    def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
+        return self.parent_row, 0, self.parent_item
+
+    def child_item(self, row: int, column: int, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
+        # todo
+        pass
+
+
 class RequestItemModel(QAbstractItemModel):
 
     def __init__(self, view: RequestView, req: Request, resp=Response()):
@@ -337,6 +382,9 @@ class RequestItemModel(QAbstractItemModel):
                        ConstRequestItems.ResponseHeaderItem(self.req, self.resp),
                        ConstRequestItems.ResponseBodyItem(self.req, self.resp)]
         self._const_item_dict = {type(item): item for item in const_items}
+        self.req_headers_item = JsonLevelItem(self.req.headers, ConstRows.RequestRow.HEADER,
+                                              self._const_item_dict.get(ConstRequestItems.RequestHeaderItem))
+        self.req_params_item = req.prepare().headers
 
     def columnCount(self, parent: QModelIndex = None) -> int:
         return 2

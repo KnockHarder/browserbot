@@ -3,9 +3,9 @@ from typing import Any, Optional
 
 from langchain.prompts import BasePromptTemplate
 
-from browser import Browser, get_browser
-from browser_dom import PageNode
-from browser_page import BrowserPage, CommandException
+from ..browser import Browser, get_browser
+from ..browser_dom import PageNode
+from ..browser_page import BrowserPage, CommandException
 
 HOME_PAGE = 'https://chat.openai.com'
 FIND_NODE_TIMEOUT = 2

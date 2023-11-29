@@ -6,10 +6,10 @@ from bs4 import BeautifulSoup
 from langchain import prompts
 from transformers import AutoTokenizer
 
-from browser import get_browser
-from browser_dom import PageNode
-from browser_page import BrowserPage
-from gpt import ChatGptPage
+from ..browser import get_browser
+from ..browser_dom import PageNode
+from ..browser_page import BrowserPage
+from ..gpt import ChatGptPage
 
 ARTICLE_READ_TIMEOUT = 5
 

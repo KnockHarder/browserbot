@@ -4,11 +4,11 @@ from PySide6.QtCore import Signal, Slot, Qt
 from PySide6.QtGui import QPicture
 from PySide6.QtWidgets import QFrame, QWidget, QListWidgetItem
 
-import gpt.reader as gpt_reader
-from browser import Browser, get_browser
-from browser_page import BrowserPage
-from gpt.reader import Article
-from mywidgets import MarkdownItemDelegate
+from ..browser import get_browser
+from ..browser_page import BrowserPage
+from ..gpt import Article
+from ..gpt import reader as gpt_reader
+from ..widgets import MarkdownItemDelegate
 
 
 class PageArticleReader:
@@ -46,7 +46,7 @@ class GptReadArticleFrame(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        from ui.gpt_read_article_frame_uic import Ui_gptReadArticleFrame
+        from ..ui.gpt_read_article_frame_uic import Ui_gptReadArticleFrame
         self.ui = Ui_gptReadArticleFrame()
         self.ui.setupUi(self)
         self.ui.articleListWidget.setItemDelegate(MarkdownItemDelegate())

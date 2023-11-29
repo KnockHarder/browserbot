@@ -16,11 +16,11 @@ from PySide6.QtWidgets import QFrame, QWidget, QFileDialog, QApplication, \
     QMenu, QAbstractItemView, QFormLayout, QLineEdit, QTableView, \
     QStyleOptionViewItem, QAbstractItemDelegate, QHBoxLayout, QPushButton, QStyle
 
-import mywidgets.dialog as my_dialog
-import url_manager_frame_rc
-from browser import get_browser
-from config import url_table_data_dir
-from mywidgets import AccessibleTableUi
+from .. import resources_rc
+from ..browser import get_browser
+from ..config import url_table_data_dir
+from ..widgets import AccessibleTableUi
+from ..widgets import dialog as my_dialog
 
 
 def read_tab_data_from_file(path: str):
@@ -57,7 +57,7 @@ class UrlManagerTabFrame(QFrame):
         super().__init__(parent)
 
         self.is_saving = False
-        from ui.url_manager_tab_uic import Ui_Frame
+        from ..ui.url_manager_tab_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
         tab_widget = self.ui.tabWidget
@@ -481,7 +481,7 @@ class OperatorColumnItemDelegate(QAbstractItemDelegate):
         widget = QWidget(view)
         widget.setLayout(QHBoxLayout(widget))
         widget.layout().setContentsMargins(0, 0, 0, 0)
-        delete_btn = QPushButton(QPixmap(':/rowOperator/delete.svg').scaled(14, 14), None, widget)
+        delete_btn = QPushButton(QPixmap(':/rowOperator/resources/delete.svg').scaled(14, 14), None, widget)
         delete_btn.setFixedWidth(30)
         delete_btn.setStyleSheet('border: none')
         delete_btn.clicked.connect(_delete_row)
@@ -506,5 +506,5 @@ if __name__ == '__main__':
         sys.exit(app.exec())
 
 
-    _ = dir(url_manager_frame_rc)
+    _ = dir(resources_rc)
     main()

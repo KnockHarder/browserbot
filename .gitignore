@@ -6,4 +6,7 @@
 *_rc.py
 /.eggs/
 __pycache__
-/WuWuWu.egg-info/
+/*.egg-info/
+/build/
+/requirements.txt
+*.*-e

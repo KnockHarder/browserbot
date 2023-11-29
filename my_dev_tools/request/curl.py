@@ -1,7 +1,6 @@
 import argparse
 import os.path
 import shlex
-import urllib.request
 from urllib.parse import urlencode
 
 import requests

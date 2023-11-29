@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, QPoint, QRect, QAbstractItemModel
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QPushButton, QAbstractItemView, QTableView
 
-import mywidgets_rc
+from .. import resources_rc
 
 
 class AccessibleTableUi:
@@ -55,7 +55,7 @@ class AccessibleTableUi:
             buttons.append(btn)
 
     def create_add_row_button(self, row: int):
-        btn = QPushButton(QPixmap(u":/tableRow/add.svg").scaled(10, 4), None, self.view)
+        btn = QPushButton(QPixmap(u":/tableRow/resources/add.svg").scaled(10, 4), None, self.view)
         btn.move(-10, -10)
         btn.setFixedHeight(6)
         btn.setStyleSheet('background-color: #AA87CEEB; border: none')
@@ -94,4 +94,4 @@ class AccessibleTableUi:
 
 
 if __name__ == '__main__':
-    _ = dir(mywidgets_rc)
+    _ = dir(resources_rc)
