@@ -45,4 +45,3 @@ cd "$projectDir"
 rm -rf dist/* || TRUE
 rm -rf build
 python setup.py py2app -A
-open dist

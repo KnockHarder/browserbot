@@ -29,7 +29,8 @@ class AppWindow(QMainWindow):
         self.bind_keys()
 
     def bind_keys(self):
-        QShortcut(QKeySequence.StandardKey.Close, self, self._close_curr_window, Qt.ShortcutContext.ApplicationShortcut)
+        QShortcut(QKeySequence.StandardKey.Close, self, self._close_curr_window,
+                  context=Qt.ShortcutContext.ApplicationShortcut)
         for i in range(0, 9):
             num_key = (i + 1) % 10
             QShortcut(f"Ctrl+{num_key}", self, lambda _i=i: self._switch_tab(_i))
