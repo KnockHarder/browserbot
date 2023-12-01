@@ -1,19 +1,24 @@
 import argparse
 import os.path
 import shlex
-from urllib.parse import urlencode
+import urllib.parse as url_parse
 
-import requests
 from requests import Request
 
 
 def parse_curl(command: str) -> Request:
     args = _parse_args(command)
-    req = Request(method=args.method, url=args.url)
-    req.method = args.method
+    req = Request(method=args.method)
+    _set_url_and_params(req, args.url)
     _set_headers(req, args)
     _set_url_encode_data(args, req)
     return req
+
+
+def _set_url_and_params(req: Request, url: str):
+    parsed_url = url_parse.urlparse(url)
+    req.url = parsed_url.scheme + '://' + parsed_url.netloc + parsed_url.path
+    req.params = {k: v[0] if len(v) == 1 else v for k, v in url_parse.parse_qs(parsed_url.query).items()}
 
 
 def _parse_args(command) -> argparse.Namespace:
@@ -43,15 +48,16 @@ def _set_url_encode_data(args, req):
         parts = raw_data.split('=')
         form_params[parts[0].strip()] = '='.join(parts[1:]).strip()
     if form_params:
-        req.data = urlencode(form_params)
+        req.data = url_parse.urlencode(form_params)
 
 
 def main():
     with open(os.path.expanduser('~/Downloads/curl.sh')) as f:
         command = f.read()
     req = parse_curl(command)
-    with requests.session().send(req.prepare()) as resp:
-        print(resp.content)
+    raw = req.data
+    parsed = url_parse.parse_qs(raw)
+    print(parsed)
 
 
 if __name__ == '__main__':

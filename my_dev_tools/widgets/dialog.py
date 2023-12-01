@@ -70,7 +70,8 @@ def show_message(icon: QMessageBox.Icon, title: str, text, *,
                  detail: str = None,
                  standard_buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Close,
                  standard_btn_func_map: dict[QMessageBox.StandardButton, Callable[[], None]] = None,
-                 window_modal=Qt.WindowModality.WindowModal):
+                 window_modal=Qt.WindowModality.WindowModal,
+                 raise_up=True):
     def _btn_clicked(btn: QAbstractButton):
         standard_button = box.standardButton(btn)
         func = standard_btn_func_map.get(standard_button) if standard_btn_func_map else None
@@ -88,3 +89,5 @@ def show_message(icon: QMessageBox.Icon, title: str, text, *,
     box.buttonClicked.connect(_btn_clicked)
     box.setWindowModality(window_modal)
     box.show()
+    if raise_up:
+        box.raise_()

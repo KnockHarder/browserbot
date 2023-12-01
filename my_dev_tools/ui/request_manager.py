@@ -1,5 +1,4 @@
 import enum
-import json
 from abc import abstractmethod, ABC
 from typing import Optional, Any
 from urllib.parse import urlparse, ParseResult
@@ -7,6 +6,8 @@ from urllib.parse import urlparse, ParseResult
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt
 from PySide6.QtWidgets import QFrame, QWidget, QHBoxLayout, QTreeWidget, QTreeView
 from requests import Request, Response
+
+from ..my_request import parse_request_body, pase_response_body
 
 
 class RequestFrame(QFrame):
@@ -71,7 +72,7 @@ class AbstractRequestItem(ABC):
         pass
 
     @abstractmethod
-    def child_sub_row_count(self, child: QModelIndex) -> int:
+    def row_count(self, item_idx: QModelIndex) -> int:
         pass
 
     def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
@@ -82,31 +83,10 @@ class AbstractRequestItem(ABC):
 
 
 class ConstRequestItems:
-    @staticmethod
-    def _body_len(obj):
-        return len(obj) if isinstance(obj, (dict, list)) else 1
-
-    @staticmethod
-    def _parse_req_data(req: Request):
-        if isinstance(req.data, str):
-            try:
-                return json.loads(req.data)
-            except Exception as e:
-                print(e)
-        return req.data
-
-    @staticmethod
-    def _parse_resp_data(resp: Response):
-        try:
-            return json.loads(resp.content)
-        except Exception as e:
-            print(e)
-        return resp.content
-
     class TopLevelItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
+        def __init__(self, req: Request):
             self.req = req
-            self.resp = resp
+            self.child_item_dict = dict[int, AbstractRequestItem]()
             self.text_data_dict = {
                 ConstRows.RootRow.URL: ('URL', self.req.url),
                 ConstRows.RootRow.METHOD: ('请求方式', self.req.method),
@@ -130,24 +110,27 @@ class ConstRequestItems:
         def url(self) -> ParseResult:
             return urlparse(self.req.url)
 
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            if child.row() == ConstRows.RootRow.REQUEST:
+        def row_count(self, item_idx: QModelIndex) -> int:
+            if item_idx.row() == ConstRows.RootRow.REQUEST:
                 return len(ConstRows.RequestRow)
-            elif child.row() == ConstRows.RootRow.RESPONSE:
+            elif item_idx.row() == ConstRows.RootRow.RESPONSE:
                 return len(ConstRows.ResponseRow)
             return 0
 
         def child_item(self, _, __, parent: QModelIndex) -> Optional[AbstractRequestItem]:
-            if parent.row() == ConstRows.RootRow.REQUEST:
-                return ConstRequestItems.RequestItem(self.req, self.resp)
-            elif parent.row() == ConstRows.RootRow.RESPONSE:
-                return ConstRequestItems.ResponseItem(self.req, self.resp)
-            return None
+            return self.child_item_dict.get(parent.row())
 
     class RequestItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
+        def __init__(self, req: Request, resp: Response, parent_item: AbstractRequestItem):
             self.req = req
             self.resp = resp
+            self.parent_item = parent_item
+            self.request_header_item = LeveledDataItem(ConstRows.RequestRow.HEADER, '$', self.req.headers,
+                                                       ConstRows.RootRow.REQUEST, self)
+            self.request_params_item = LeveledDataItem(ConstRows.RequestRow.PARAMS, '$', self.req.params,
+                                                       ConstRows.RootRow.REQUEST, self)
+            self.request_body_item = LeveledDataItem(ConstRows.RequestRow.BODY, '$', parse_request_body(self.req),
+                                                     ConstRows.RootRow.REQUEST, self)
 
         def data(self, index: QModelIndex, role=-1) -> Any:
             if role != Qt.ItemDataRole.DisplayRole:
@@ -160,31 +143,38 @@ class ConstRequestItems:
                 return ('请求体', '')[index.column()]
             return None
 
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            if child.row() == ConstRows.RequestRow.HEADER:
+        def row_count(self, item_idx: QModelIndex) -> int:
+            if item_idx.row() == ConstRows.RequestRow.HEADER:
                 return len(self.req.headers)
-            elif child.row() == ConstRows.RequestRow.PARAMS:
+            elif item_idx.row() == ConstRows.RequestRow.PARAMS:
                 return len(self.req.params)
-            elif child.row() == ConstRows.RequestRow.BODY:
-                return ConstRequestItems._body_len(ConstRequestItems._parse_req_data(self.req))
+            elif item_idx.row() == ConstRows.RequestRow.BODY:
+                body = parse_request_body(self.req)
+                return len(body) if isinstance(body, (list, dict)) else 0
             return 0
 
         def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.RootRow.REQUEST, 0, ConstRequestItems.TopLevelItem(self.req, self.resp)
+            return ConstRows.RootRow.REQUEST, 0, self.parent_item
 
-        def child_item(self, _, __, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
+        def child_item(self, row: int, column: int, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
             if parent.row() == ConstRows.RequestRow.HEADER:
-                return ConstRequestItems.RequestHeaderItem(self.req, self.resp)
+                return self.request_header_item.child_item(row, column, parent)
             elif parent.row() == ConstRows.RequestRow.PARAMS:
-                return ConstRequestItems.RequestItem(self.req, self.resp)
+                return self.request_params_item.child_item(row, column, parent)
             elif parent.row() == ConstRows.RequestRow.BODY:
-                return ConstRequestItems.RequestBodyItem(self.req, self.resp)
+                return self.request_body_item.child_item(row, column, parent)
             return None
 
     class ResponseItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
+        def __init__(self, req: Request, resp: Response, parent_item: AbstractRequestItem):
             self.req = req
             self.resp = resp
+            self.parent_item = parent_item
+
+            self.response_header_item = LeveledDataItem(ConstRows.ResponseRow.HEADER, '$', self.resp.headers,
+                                                        ConstRows.RootRow.RESPONSE, self)
+            self.response_body_item = LeveledDataItem(ConstRows.ResponseRow.BODY, '$', pase_response_body(self.resp),
+                                                      ConstRows.RootRow.RESPONSE, self)
 
         def data(self, index: QModelIndex, role=-1) -> Any:
             if role != Qt.ItemDataRole.DisplayRole:
@@ -195,175 +185,64 @@ class ConstRequestItems:
                 return ('响应体', '')[index.column()]
             return None
 
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            if child.row() == ConstRows.ResponseRow.HEADER:
+        def row_count(self, item_idx: QModelIndex) -> int:
+            if item_idx.row() == ConstRows.ResponseRow.HEADER:
                 return len(self.resp.headers)
-            elif child.row() == ConstRows.ResponseRow.BODY:
-                return ConstRequestItems._body_len(ConstRequestItems._parse_resp_data(self.resp))
+            elif item_idx.row() == ConstRows.ResponseRow.BODY:
+                body = pase_response_body(self.resp)
+                return len(body) if isinstance(body, (list, dict)) else 0
             return 0
 
         def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.RootRow.RESPONSE, 0, ConstRequestItems.TopLevelItem(self.req, self.resp)
+            return ConstRows.RootRow.RESPONSE, 0, self.parent_item
 
-        def child_item(self, _, __, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
+        def child_item(self, row: int, column: int, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
             if parent.row() == ConstRows.ResponseRow.HEADER:
-                return ConstRequestItems.ResponseHeaderItem(self.req, self.resp)
+                return self.response_header_item.child_item(row, column, parent)
             elif parent.row() == ConstRows.ResponseRow.BODY:
-                return ConstRequestItems.ResponseBodyItem(self.req, self.resp)
+                return self.response_body_item.child_item(row, column, parent)
             return None
 
-    class RequestHeaderItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
-            self.req = req
-            self.resp = resp
 
-        def data(self, index: QModelIndex, role=-1) -> Any:
-            if role != Qt.ItemDataRole.DisplayRole:
-                return None
-            if index.column() == 0:
-                return list(self.req.headers.keys())[index.row()]
-            elif index.column() == 1:
-                return list(self.req.headers.values())[index.row()]
-            return None
-
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            return 0
-
-        def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.RequestRow.HEADER, 0, ConstRequestItems.RequestItem(self.req, self.resp)
-
-    class RequestParamsItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
-            self.req = req
-            self.resp = resp
-
-        def data(self, index: QModelIndex, role=-1) -> Any:
-            if role != Qt.ItemDataRole.DisplayRole:
-                return None
-            if index.column() == 0:
-                return list(self.req.params.keys())[index.row()]
-            elif index.column() == 1:
-                return list(self.req.params.values())[index.row()]
-            return None
-
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            return 0
-
-        def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.RequestRow.PARAMS, 0, ConstRequestItems.RequestItem(self.req, self.resp)
-
-    class RequestBodyItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
-            self.req = req
-            self.resp = resp
-
-        def data(self, index: QModelIndex, role=-1) -> Any:
-            if role != Qt.ItemDataRole.DisplayRole:
-                return None
-            data = ConstRequestItems._parse_req_data(self.req)
-            if isinstance(data, dict):
-                if index.column() == 0:
-                    return list(data.keys())[index.row()]
-                elif index.column() == 1:
-                    return str(list(data.values())[index.row()])  # todo
-            elif isinstance(data, list):
-                return (f'[{index.row()}]', data[index.row()])[index.column()]
-            return None
-
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            return 0
-
-        def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.RequestRow.BODY, 0, ConstRequestItems.RequestItem(self.req, self.resp)
-
-    class ResponseHeaderItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
-            self.req = req
-            self.resp = resp
-
-        def data(self, index: QModelIndex, role=-1) -> Any:
-            if role != Qt.ItemDataRole.DisplayRole:
-                return None
-            if index.column() == 0:
-                return list(self.resp.headers.keys())[index.row()]
-            elif index.column() == 1:
-                return list(self.resp.headers.values())[index.row()]
-            return None
-
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            return 0
-
-        def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.ResponseRow.HEADER, 0, ConstRequestItems.ResponseItem(self.req, self.resp)
-
-    class ResponseBodyItem(AbstractRequestItem):
-        def __init__(self, req: Request, resp: Response):
-            self.req = req
-            self.resp = resp
-
-        def data(self, index: QModelIndex, role=-1) -> Any:
-            if role != Qt.ItemDataRole.DisplayRole:
-                return None
-            data = ConstRequestItems._parse_resp_data(self.resp)
-            if isinstance(data, dict):
-                if index.column() == 0:
-                    return list(data.keys())[index.row()]
-                elif index.column() == 1:
-                    return str(list(data.values())[index.row()])
-            elif isinstance(data, list):
-                return (f'[{index.row()}]', data[index.row()])[index.column()]
-            return None
-
-        def child_sub_row_count(self, child: QModelIndex) -> int:
-            return 0
-
-        def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
-            return ConstRows.ResponseRow.BODY, 0, ConstRequestItems.ResponseItem(self.req, self.resp)
-
-
-class JsonLevelItem(AbstractRequestItem):
-    def __init__(self, data: Any, parent_row: int, parent_item: AbstractRequestItem):
-        self.data = data
+class LeveledDataItem(AbstractRequestItem):
+    def __init__(self, row: int, key: str, value: Any, parent_row: int, parent_item: AbstractRequestItem):
+        self.row = row
+        self.key = key
+        self.value = value
         self.parent_row = parent_row
         self.parent_item = parent_item
-        self.children = []
+        self.children: list[LeveledDataItem] = [None] * len(value) if isinstance(value, (list, dict)) else []
 
     def data(self, index: QModelIndex, role=-1) -> Any:
         if role in [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]:
-            return self.display_data(index)
+            if isinstance(self.value, (list, dict)) or not self.value:
+                display_value = ''
+            else:
+                display_value = str(self.value)
+            return (str(self.key), display_value)[index.column()]
 
-    def display_data(self, index: QModelIndex) -> Any:
-        data = self.row_data(index.row())
-        if isinstance(data, tuple):
-            k, v = data
-            v = '' if isinstance(v, (list, dict)) or not v else str(v)
-            return (k, v)[index.column()]
-        if data:
-            return (str(data), '')[index.column()]
-        return None
-
-    def row_data(self, row: int) -> Any:
-        if isinstance(self.data, dict):
-            key_list = sorted(list(self.data.keys()))
-            return key_list[row], self.data[key_list[row]]
-        elif isinstance(self.data, list):
-            return self.data[row]
-        return None
-
-    def child_sub_row_count(self, child: QModelIndex) -> int:
-        data = self.row_data(child.row())
-        if isinstance(data, tuple):
-            _, data = data
-        if isinstance(data, (dict, list)):
-            return len(data)
-        return 0
+    def row_count(self, item_idx: QModelIndex) -> int:
+        return len(self.value) if isinstance(self.value, (list, dict)) else 0
 
     def parent_index(self) -> (int, int, Optional["AbstractRequestItem"]):
         return self.parent_row, 0, self.parent_item
 
     def child_item(self, row: int, column: int, parent: QModelIndex) -> Optional["AbstractRequestItem"]:
-        # todo
-        pass
+        if len(self.children) <= row:
+            return None
+        if self.children[row]:
+            return self.children[row]
+        key, value = self.row_kv(row)
+        self.children[row] = LeveledDataItem(row, key, value, self.row, self)
+        return self.children[row]
+
+    def row_kv(self, row: int) -> Optional[tuple]:
+        if isinstance(self.value, dict):
+            key_list = sorted(list(self.value.keys()))
+            return key_list[row], self.value[key_list[row]]
+        elif isinstance(self.value, list):
+            return f'[{row}]', self.value[row]
+        return None
 
 
 class RequestItemModel(QAbstractItemModel):
@@ -373,18 +252,14 @@ class RequestItemModel(QAbstractItemModel):
         self.view = view
         self.req = req
         self.resp = resp
-        const_items = [ConstRequestItems.TopLevelItem(self.req, self.resp),
-                       ConstRequestItems.RequestItem(self.req, self.resp),
-                       ConstRequestItems.ResponseItem(self.req, self.resp),
-                       ConstRequestItems.RequestHeaderItem(self.req, self.resp),
-                       ConstRequestItems.RequestParamsItem(self.req, self.resp),
-                       ConstRequestItems.RequestBodyItem(self.req, self.resp),
-                       ConstRequestItems.ResponseHeaderItem(self.req, self.resp),
-                       ConstRequestItems.ResponseBodyItem(self.req, self.resp)]
-        self._const_item_dict = {type(item): item for item in const_items}
-        self.req_headers_item = JsonLevelItem(self.req.headers, ConstRows.RequestRow.HEADER,
-                                              self._const_item_dict.get(ConstRequestItems.RequestHeaderItem))
-        self.req_params_item = req.prepare().headers
+
+        self.top_level_item = ConstRequestItems.TopLevelItem(self.req)
+        self.request_item = ConstRequestItems.RequestItem(self.req, self.resp, self.top_level_item)
+        self.response_item = ConstRequestItems.ResponseItem(self.req, self.resp, self.top_level_item)
+        self.top_level_item.child_item_dict = {
+            ConstRows.RootRow.REQUEST.value: self.request_item,
+            ConstRows.RootRow.RESPONSE.value: self.response_item
+        }
 
     def columnCount(self, parent: QModelIndex = None) -> int:
         return 2
@@ -392,21 +267,19 @@ class RequestItemModel(QAbstractItemModel):
     def rowCount(self, parent: QModelIndex = None) -> int:
         if not parent.isValid():
             return len(ConstRows.RootRow)
-        item = parent.internalPointer()
-        if not isinstance(item, AbstractRequestItem):
+        parent_item = parent.internalPointer()
+        if not isinstance(parent_item, AbstractRequestItem):
             return 0
-        return item.child_sub_row_count(parent)
+        return parent_item.row_count(parent)
 
     def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
         if not parent.isValid():
-            item = ConstRequestItems.TopLevelItem(self.req, self.resp)
+            item = self.top_level_item
         else:
             parent_item: AbstractRequestItem = parent.internalPointer()
             item = parent_item.child_item(row, column, parent)
-        if item:
-            item = self._const_item_dict.get(type(item))
         return self.createIndex(row, column, item)
 
     def parent(self, child: QModelIndex = None) -> QModelIndex:
@@ -414,8 +287,6 @@ class RequestItemModel(QAbstractItemModel):
         if not isinstance(item, AbstractRequestItem):
             return QModelIndex()
         row, col, parent_item = item.parent_index()
-        if parent_item:
-            parent_item = self._const_item_dict.get(type(parent_item))
         return self.createIndex(row, col, parent_item)
 
     def data(self, index: QModelIndex, role=-1) -> Any:
@@ -425,13 +296,18 @@ class RequestItemModel(QAbstractItemModel):
 
 def main():
     import sys
+    import os
     from PySide6.QtWidgets import QApplication
+    from my_dev_tools.my_request.curl import parse_curl
+
     app = QApplication()
-    request = Request(method='POST', url='https://api.gotalk.to/api/v1/chat/ask', data='{"question": "你好"}')
-    view = RequestView(request)
+    with open(os.path.expanduser('~/Downloads/curl.sh')) as f:
+        command = f.read()
+
+    req = parse_curl(command)
+    view = RequestView(req)
+    for i in range(view.model().columnCount()):
+        view.resizeColumnToContents(i)
+    view.setFixedSize(600, 400)
     view.show()
     sys.exit(app.exec())
-
-
-if __name__ == '__main__':
-    main()
