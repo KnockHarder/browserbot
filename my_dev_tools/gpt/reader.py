@@ -108,7 +108,3 @@ def main():
 
     page = ChatGptPage()
     asyncio.get_event_loop().run_until_complete(_do())
-
-
-if __name__ == '__main__':
-    main()
