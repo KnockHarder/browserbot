@@ -200,6 +200,8 @@ class UrlTableView(QTableView):
         self.init_menu()
         self.doubleClicked.connect(self.go_cell_url)
 
+        self.model().dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+
     def paintEvent(self, e: QPaintEvent) -> None:
         super().paintEvent(e)
         self.accessible_ui.update_add_row_buttons()
@@ -493,18 +495,14 @@ class OperatorColumnItemDelegate(QAbstractItemDelegate):
         return QSize(200, rect.height())
 
 
-if __name__ == '__main__':
-    def main():
-        app = QApplication()
-        table = UrlTableView(url_list=[UrlData('bug', '搞不定', 'https://baidu.com')])
-        table.setFixedSize(1000, 600)
-        table.show()
-
-        timer = QTimer(table)
-        timer.timeout.connect(lambda: print(table.get_url_datas()))
-        timer.start(5_000)
-        sys.exit(app.exec())
-
-
+def main():
     _ = dir(resources_rc)
-    main()
+    app = QApplication()
+    table = UrlTableView(url_list=[UrlData('bug', '搞不定', 'https://baidu.com')])
+    table.setFixedSize(1000, 600)
+    table.show()
+
+    timer = QTimer(table)
+    timer.timeout.connect(lambda: print(table.get_url_datas()))
+    timer.start(5_000)
+    sys.exit(app.exec())
