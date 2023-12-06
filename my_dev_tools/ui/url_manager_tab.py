@@ -201,6 +201,7 @@ class UrlTableView(QTableView):
         self.doubleClicked.connect(self.go_cell_url)
 
         self.model().dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+        self.model().rowsInserted.connect(self.edit_row_if_inserted_single)
 
     def paintEvent(self, e: QPaintEvent) -> None:
         super().paintEvent(e)
@@ -212,18 +213,15 @@ class UrlTableView(QTableView):
             self.accessible_ui.show_add_row_button_hovered(e)
         return result
 
-    def delete_row_by_click(self):
-        widget = self.sender()
-        for row in range(self.model().rowCount()):
-            index = self.model().index(row, UrlTableItemModel.OPERATOR_COLUMN)
-            if widget == self.indexWidget(index):
-                self.model().removeRow(row)
-                return
-
     def go_cell_url(self, index: QModelIndex):
         url = index.data(UrlTableItemModel.LINK_ITEM_ROLE)
         if url:
             asyncio.create_task(self.browser.find_or_open(url, activate=True), name='Open Url')
+
+    def edit_row_if_inserted_single(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int):
+        if start == end:
+            self.setCurrentIndex(self.model().index(start, UrlTableItemModel.CATEGORY_COLUMN, parent))
+            self.edit(self.model().index(start, UrlTableItemModel.CATEGORY_COLUMN, parent))
 
     def rowsAboutToBeRemoved(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int) -> None:
         for row in range(start, end + 1):
