@@ -86,16 +86,6 @@ QListWidget::item:selected:!active {
     </item>
     <item>
      <widget class="MainTabWidget" name="main_tab_widget">
-      <property name="styleSheet">
-       <string notr="true">#main_tab_widget::tab-bar {
-	height: 0;
-}
-#main_tab_widget::pane {
-	border: none;
-	spacing: 0;
-	margin: -25px 0 -20px -20px;
-}</string>
-      </property>
       <property name="tabShape">
        <enum>QTabWidget::Rounded</enum>
       </property>

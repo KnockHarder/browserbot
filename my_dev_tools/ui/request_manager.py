@@ -2,16 +2,26 @@ import enum
 import socket
 from datetime import datetime
 from typing import Optional, Any
+from urllib import parse as url_parse
 from urllib.parse import urlparse
 
 import requests
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot
-from PySide6.QtWidgets import QFrame, QWidget
-from requests import Request, Response
+from PySide6.QtWidgets import QFrame, QWidget, QTableView
+from requests import Response, PreparedRequest
+
+
+def _init_tab_widget_layout(tab_widget):
+    tab_widget.setCurrentIndex(0)
+    for idx in range(tab_widget.count()):
+        widget = tab_widget.widget(idx)
+        if isinstance(widget, QWidget) and widget.layout():
+            widget.layout().setContentsMargins(0, 0, 0, 0)
+            widget.layout().setSpacing(0)
 
 
 class ReqRespFrame(QFrame):
-    _req: Request
+    _req: PreparedRequest
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -19,31 +29,19 @@ class ReqRespFrame(QFrame):
         from .req_resp_frame_uic import Ui_ReqRespFrame
         self.ui = Ui_ReqRespFrame()
         self.ui.setupUi(self)
-        self.init_tab_widget()
+        _init_tab_widget_layout(self.ui.main_tab_widget)
 
-        view = self.ui.basic_info_table_view
-        model = BasicInfoItemModel(view)
-        self.basic_info_view = view
-        self.basic_model = model
-        view.setModel(self.basic_model)
-        model.dataChanged.connect(lambda *args: view.resizeColumnsToContents())
-
-    def init_tab_widget(self):
-        tab_widget = self.ui.main_tab_widget
-        tab_widget.setCurrentIndex(0)
-        for idx in range(tab_widget.count()):
-            widget = tab_widget.widget(idx)
-            if isinstance(widget, QWidget) and widget.layout():
-                widget.layout().setContentsMargins(0, 0, 0, 0)
-                widget.layout().setSpacing(0)
-
-    def update_request(self, req: Request):
+    def update_request(self, req: PreparedRequest):
         self._req = req
         self.update_url_area(req)
-        self.basic_model.update_request(req)
+        self.ui.basic_info_table_view.update_request(req)
+        queries = url_parse.parse_qs(url_parse.urlparse(req.url).query)
+        url_params = {k: v[0] if len(v) == 1 else v for k, v in queries.items()}
+        self.ui.url_params_table_view.update_params(url_params)
         self.ui.req_headers_frame.update_headers(req.headers)
+        self.ui.req_body_frame.update_body(req)
 
-    def update_url_area(self, req):
+    def update_url_area(self, req: PreparedRequest):
         req_method_box = self.ui.req_method_box
         req_method_box.clear()
         req_method_box.addItems(['GET', 'POST'])
@@ -61,7 +59,7 @@ class ReqRespFrame(QFrame):
         req_path_input.setText(parsed_url.path)
 
     def update_response(self, resp: Response):
-        self.basic_model.update_response(resp)
+        self.ui.basic_info_table_view.update_response(resp)
         self.ui.resp_headers_frame.update_headers(resp.headers)
 
     @property
@@ -70,11 +68,31 @@ class ReqRespFrame(QFrame):
 
     @Slot()
     def send_request(self):
-        prepared = self.request.prepare()
-        self.basic_model.update_req_start_time(datetime.now())
-        response = requests.request(prepared.method, prepared.url, headers=prepared.headers, data=prepared.body)
-        self.basic_model.update_req_end_time(datetime.now())
+        req = self.request
+        self.ui.basic_info_table_view.update_req_start_time(datetime.now())
+        response = requests.request(req.method, req.url, headers=req.headers, data=req.body)
+        self.ui.basic_info_table_view.update_req_end_time(datetime.now())
         self.update_response(response)
+
+
+class BasicInfoTableView(QTableView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._model = BasicInfoItemModel(self)
+        self.setModel(self._model)
+        self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+
+    def update_request(self, req: PreparedRequest):
+        self._model.update_request(req)
+
+    def update_response(self, resp: Response):
+        self._model.update_response(resp)
+
+    def update_req_start_time(self, req_start_time: datetime):
+        self._model.update_req_start_time(req_start_time)
+
+    def update_req_end_time(self, req_end_time: datetime):
+        self._model.update_req_end_time(req_end_time)
 
 
 class BasicInfoItemModel(QAbstractItemModel):
@@ -88,11 +106,11 @@ class BasicInfoItemModel(QAbstractItemModel):
         SERVER_IP = '服务器IP'
         SERVER_PORT = '服务器端口'
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget):
         super().__init__(parent)
         self.value_dict = dict[str, str]()
 
-    def update_request(self, req: Request):
+    def update_request(self, req: PreparedRequest):
         self.value_dict.clear()
         parsed_url = urlparse(req.url)
         self.value_dict[self.Label.SERVER] = parsed_url.hostname
@@ -157,15 +175,23 @@ class ReqRespHeadersFrame(QFrame):
     def update_headers(self, headers):
         self._headers_model.update_headers(headers)
 
-    def resize_contents(self, *args):
+    def resize_contents(self, *_):
         table_view = self.ui.headers_table_view
         table_view.resizeColumnsToContents()
         self.ui.key_search_input.setFixedWidth(table_view.columnWidth(0))
         self.ui.value_search_input.setFixedWidth(table_view.columnWidth(1))
 
 
+class HeadersTableView(QTableView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._model = HeadersTableModelItem(dict(), self)
+        self.setModel(self._model)
+        self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+
+
 class HeadersTableModelItem(QAbstractItemModel):
-    def __init__(self, headers: dict, parent: Optional[QWidget] = None):
+    def __init__(self, headers: dict, parent: QWidget):
         super().__init__(parent)
         self.headers = headers
 
@@ -181,16 +207,22 @@ class HeadersTableModelItem(QAbstractItemModel):
 
     def data(self, index: QModelIndex, role: int = -1) -> Any:
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole) and index.isValid():
-            key = list(self.headers.keys())[index.row()]
+            key = self._header_key_at(index)
             if index.column() == 0:
                 return key
             elif index.column() == 1:
                 return self.headers[key]
         return None
 
+    def _header_key_at(self, index):
+        key_list = list(self.headers.keys())
+        key_list.sort()
+        key = key_list[index.row()]
+        return key
+
     def setData(self, index: QModelIndex, value: Any, role: int = -1) -> bool:
         if role == Qt.ItemDataRole.EditRole and index.isValid():
-            key = list(self.headers.keys())[index.row()]
+            key = self._header_key_at(index)
             if index.column() == 0:
                 self.headers[value] = self.headers.pop(key)
             elif index.column() == 1:
@@ -210,6 +242,140 @@ class HeadersTableModelItem(QAbstractItemModel):
         return None
 
 
+class UrlParamsTableView(QTableView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._model = UrlParamsTableModelItem(dict(), self)
+        self.setModel(self._model)
+        self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+
+    def update_params(self, params: dict):
+        self._model.update_params(params)
+
+    def params_dict(self) -> dict:
+        return self._model.params
+
+
+class UrlParamsTableModelItem(QAbstractItemModel):
+    ITEM_VALUE_TYPE_ROLE = Qt.ItemDataRole.UserRole + 1
+
+    def __init__(self, params: dict, parent: QWidget):
+        super().__init__(parent)
+        self.params = params
+
+    def update_params(self, params: dict):
+        self.params.update(params)
+        self.layoutChanged.emit()
+
+    def rowCount(self, parent: QModelIndex = None) -> int:
+        return len(self.params)
+
+    def columnCount(self, parent: QModelIndex = None) -> int:
+        return 2
+
+    def data(self, index: QModelIndex, role: int = -1) -> Any:
+        if not index.isValid():
+            return None
+        key = self._param_key_at(index)
+        if index.column() == 0:
+            if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
+                return key
+            elif role == self.ITEM_VALUE_TYPE_ROLE:
+                return str
+        elif index.column() == 1:
+            value = self.params[key]
+            if isinstance(value, list) and len(value) == 1:
+                value = value[0]
+            if role == Qt.ItemDataRole.DisplayRole:
+                return str(value)
+            elif role == Qt.ItemDataRole.EditRole:
+                return value
+            elif role == self.ITEM_VALUE_TYPE_ROLE:
+                return type(value)
+        return None
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = -1) -> Any:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+            return ('键', '值')[section]
+        return None
+
+    def _param_key_at(self, index):
+        key_list = list(self.params.keys())
+        key_list.sort()
+        key = key_list[index.row()]
+        return key
+
+    def setData(self, index: QModelIndex, value: Any, role: int = -1) -> bool:
+        if role == Qt.ItemDataRole.EditRole and index.isValid():
+            key = self._param_key_at(index)
+            if index.column() == 0:
+                self.params[value] = self.params.pop(key)
+            elif index.column() == 1:
+                self.params[key] = value
+            else:
+                return False
+            self.dataChanged.emit(index, index)
+            return True
+        return False
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
+
+    def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
+        return self.createIndex(row, column)
+
+    def parent(self, child: QModelIndex = None) -> QModelIndex:
+        return QModelIndex()
+
+
+class ReqBodyFrame(QFrame):
+    class UnsupportedContentTypeError(Exception):
+        def __init__(self, content_type: str):
+            super().__init__(f'Unsupported content type: {content_type}')
+
+    content_type: str
+    data: Any
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        from .req_body_frame_uic import Ui_Frame
+        self.ui = Ui_Frame()
+        self.ui.setupUi(self)
+        _init_tab_widget_layout(self.ui.req_body_tab_widget)
+
+    def update_body(self, req: PreparedRequest):
+        content_type = req.headers.get('Content-Type')
+        tab_widget = self.ui.req_body_tab_widget
+        # find tab by text
+        for idx in range(tab_widget.count()):
+            widget = tab_widget.widget(idx).layout().itemAt(0).widget()
+            if tab_widget.tabText(idx) in content_type.split('/') and hasattr(widget, 'update_body'):
+                widget.update_body(req.body)
+                tab_widget.setCurrentIndex(idx)
+                return
+        raise self.UnsupportedContentTypeError(content_type)
+
+    def body_data(self) -> Any:
+        tab_widget = self.ui.req_body_tab_widget
+        widget = tab_widget.currentWidget()
+        if hasattr(widget, 'body_data'):
+            return widget.body_data()
+        return None
+
+
+class UrlParamsReqBodyWidget(UrlParamsTableView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+    def update_body(self, data):
+        params_dict = {k: v[0] if len(v) == 0 else v for k, v in url_parse.parse_qs(data).items()}
+        super().update_params(params_dict)
+
+    def body_data(self) -> Any:
+        return super().params_dict()
+
+
 def main():
     import sys
     import os
@@ -223,7 +389,7 @@ def main():
     req = parse_curl(command)
 
     frame = ReqRespFrame()
-    frame.update_request(req)
+    frame.update_request(req.prepare())
     frame.setFixedSize(800, 600)
     frame.show()
     sys.exit(app.exec())
