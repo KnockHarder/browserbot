@@ -11,13 +11,12 @@ from PySide6.QtWidgets import QFrame, QWidget, QTableView
 from requests import Response, PreparedRequest
 
 
-def _init_tab_widget_layout(tab_widget):
+def _setup_tab_widget_layout_style(tab_widget):
     tab_widget.setCurrentIndex(0)
-    for idx in range(tab_widget.count()):
-        widget = tab_widget.widget(idx)
-        if isinstance(widget, QWidget) and widget.layout():
-            widget.layout().setContentsMargins(0, 0, 0, 0)
-            widget.layout().setSpacing(0)
+    for widget in filter(lambda w: type(w) is QWidget and w.layout(),
+                         map(lambda i: tab_widget.widget(i), range(tab_widget.count()))):
+        widget.layout().setContentsMargins(0, 0, 0, 0)
+        widget.layout().setSpacing(0)
 
 
 class ReqRespFrame(QFrame):
@@ -29,7 +28,7 @@ class ReqRespFrame(QFrame):
         from .req_resp_frame_uic import Ui_ReqRespFrame
         self.ui = Ui_ReqRespFrame()
         self.ui.setupUi(self)
-        _init_tab_widget_layout(self.ui.main_tab_widget)
+        _setup_tab_widget_layout_style(self.ui.main_tab_widget)
 
     def update_request(self, req: PreparedRequest):
         self._req = req
@@ -364,7 +363,7 @@ class ReqBodyFrame(QFrame):
         from .req_body_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
-        _init_tab_widget_layout(self.ui.req_body_tab_widget)
+        _setup_tab_widget_layout_style(self.ui.req_body_tab_widget)
 
     def update_body(self, req: PreparedRequest):
         content_type = req.headers.get('Content-Type')

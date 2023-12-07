@@ -10,6 +10,8 @@ from ..widgets import dialog as my_dialog
 class MainTabWidget(QTabWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self.tabBar().hide()
+        self.setStyleSheet('QTabWidget::pane {margin-top: 0px;}')
 
     @Slot()
     def switch_tab(self, index: QModelIndex):
@@ -23,6 +25,13 @@ class AppWindow(QMainWindow):
         from .app_uic import Ui_MainWindow
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        tab_widget = self.ui.main_tab_widget
+        tab_widget.setCurrentIndex(0)
+        for widget in filter(lambda w: type(w) is QWidget and w.layout(),
+                             map(lambda i: tab_widget.widget(i), range(tab_widget.count()))):
+            widget.layout().setContentsMargins(0, 0, 0, 0)
+            widget.layout().setSpacing(0)
         self._switch_tab(0)
         self.setWindowTitle("研发工具")
 
