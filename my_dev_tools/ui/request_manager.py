@@ -1,4 +1,5 @@
 import enum
+import json
 import socket
 from datetime import datetime
 from typing import Optional, Any
@@ -7,7 +8,8 @@ from urllib.parse import urlparse
 
 import requests
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot
-from PySide6.QtWidgets import QFrame, QWidget, QTableView
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView
 from requests import Response, PreparedRequest
 
 
@@ -29,6 +31,7 @@ class ReqRespFrame(QFrame):
         self.ui = Ui_ReqRespFrame()
         self.ui.setupUi(self)
         _setup_tab_widget_layout_style(self.ui.main_tab_widget)
+        self.ui.resp_body_type_label.setText('空')
 
     def update_request(self, req: PreparedRequest):
         self._req = req
@@ -60,6 +63,17 @@ class ReqRespFrame(QFrame):
     def update_response(self, resp: Response):
         self.ui.basic_info_table_view.update_response(resp)
         self.ui.resp_headers_frame.update_headers(resp.headers)
+        content_type = resp.headers.get('Content-Type')
+        if content_type:
+            self.ui.resp_body_type_label.setText(content_type)
+            if content_type.split(';')[0] == 'application/json':
+                data = json.loads(resp.text)
+                layout = self.ui.resp_body_area_widget.layout()
+                while layout.count() > 0:
+                    item = layout.takeAt(0)
+                    if item and item.widget():
+                        item.widget().deleteLater()
+                layout.addWidget(JsonDataFrame(data, self.ui.resp_body_area_widget))
 
     @property
     def request(self):
@@ -393,6 +407,133 @@ class UrlParamsBodyFrame(UrlParamsFrame):
 
     def __body_data__(self) -> Any:
         return super().params_dict()
+
+
+class JsonModelItem:
+    def __init__(self, row: int, key: str, value: Any, parent_row: int, parent_item: Optional["JsonModelItem"]):
+        self.row = row
+        self.key = key
+        self.value = value
+        self.parent_row = parent_row
+        self.parent_item = parent_item
+        self._children: list[JsonModelItem] = ([None] * len(value)
+                                               if isinstance(value, (list, dict))
+                                               else [])
+
+    def child_count(self) -> int:
+        return len(self._children)
+
+    def data(self, index: QModelIndex, role=-1) -> Any:
+        item_data = dict[int, Any]()
+        if index.column() == 0:
+            item_data.update({
+                Qt.ItemDataRole.DisplayRole: self.key,
+                Qt.ItemDataRole.EditRole: self.key
+            })
+        elif index.column() == 1:
+            if isinstance(self.value, (list, dict)):
+                item_data.update({
+                    Qt.ItemDataRole.DisplayRole: f'<{type(self.value).__name__}({len(self.value)})>',
+                    Qt.ItemDataRole.ForegroundRole: QColor(Qt.GlobalColor.lightGray),
+                })
+            elif self.value is not None:
+                item_data.update({
+                    Qt.ItemDataRole.DisplayRole: str(self.value),
+                    Qt.ItemDataRole.EditRole: self.value,
+                    Qt.ItemDataRole.ToolTipRole: str(self.value),
+                })
+        return item_data.get(role)
+
+    def parent_index(self, model: QAbstractItemModel) -> QModelIndex:
+        return model.createIndex(self.parent_row, 0, self.parent_item)
+
+    def child_item(self, row: int) -> Optional["JsonModelItem"]:
+        if len(self._children) <= row:
+            return None
+        if self._children[row] is not None:
+            return self._children[row]
+        key, value = self.row_kv(row)
+        self._children[row] = JsonModelItem(row, key, value, self.row, self)
+        return self._children[row]
+
+    def row_kv(self, row: int) -> Optional[tuple]:
+        if isinstance(self.value, dict):
+            key_list = sorted(list(self.value.keys()))
+            return key_list[row], self.value[key_list[row]]
+        elif isinstance(self.value, list):
+            return f'[{row}]', self.value[row]
+        return None
+
+
+class JsonItemModel(QAbstractItemModel):
+    def __init__(self, parent: QWidget, data: Any):
+        super().__init__(parent)
+        self.root_item = JsonModelItem(0, '$', data, -1, None)
+
+    def update_data(self, data: Any):
+        self.root_item = JsonModelItem(0, '$', data, -1, None)
+        self.layoutChanged.emit()
+
+    def columnCount(self, parent: QModelIndex = None) -> int:
+        return 2
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if not parent.isValid():
+            return 1
+        parent_item: JsonModelItem = parent.internalPointer()
+        return parent_item.child_count()
+
+    def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
+        if not parent.isValid():
+            item = self.root_item
+        else:
+            parent_item: JsonModelItem = parent.internalPointer()
+            item = parent_item.child_item(row)
+        return self.createIndex(row, column, item)
+
+    def parent(self, child: QModelIndex = None) -> QModelIndex:
+        item: JsonModelItem = child.internalPointer()
+        if not item:
+            return QModelIndex()
+        return item.parent_index(self)
+
+    def data(self, index: QModelIndex, role=-1) -> Any:
+        item: JsonModelItem = index.internalPointer()
+        return item.data(index, role) if item else None
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = -1) -> Any:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+            return ('键', '值')[section]
+        return None
+
+
+class JsonTreeView(QTreeView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._model = JsonItemModel(self, None)
+        self.setModel(self._model)
+        self._model.dataChanged.connect(lambda *args: self.resizeColumnToContents(0))
+
+    def update_data(self, data: Any):
+        self._model.update_data(data)
+
+
+class JsonDataFrame(QFrame):
+    def __init__(self, data: Any, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        from .req_resp_json_frame_uic import Ui_Frame
+        self.ui = Ui_Frame()
+        self.ui.setupUi(self)
+        self.ui.json_tree_view.update_data(data)
+        self.ui.json_tree_view.header().sectionResized.connect(self.resize_search_widgets)
+        self.ui.json_tree_view.header().geometriesChanged.connect(self.resize_search_widgets)
+
+    def resize_search_widgets(self, *_):
+        tree_view = self.ui.json_tree_view
+        self.ui.search_edits_area_widget.setFixedWidth(tree_view.header().width())
+        self.ui.key_search_edit.setFixedWidth(tree_view.columnWidth(0))
+        self.ui.value_search_edit.setFixedWidth(tree_view.columnWidth(1))
 
 
 def main():
