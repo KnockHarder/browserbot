@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>562</width>
-    <height>353</height>
+    <width>774</width>
+    <height>461</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,16 +33,24 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QLineEdit" name="key_search_input"/>
+       <widget class="QLineEdit" name="key_search_edit">
+        <property name="clearButtonEnabled">
+         <bool>false</bool>
+        </property>
+       </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="value_search_input"/>
+       <widget class="QLineEdit" name="value_search_edit">
+        <property name="clearButtonEnabled">
+         <bool>false</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="HeadersTableView" name="headers_table_view">
+    <widget class="UrlParamsTableView" name="url_params_table_view">
      <property name="frameShape">
       <enum>QFrame::NoFrame</enum>
      </property>
@@ -52,12 +60,12 @@
      <property name="lineWidth">
       <number>0</number>
      </property>
+     <property name="dragDropOverwriteMode">
+      <bool>true</bool>
+     </property>
      <property name="alternatingRowColors">
       <bool>true</bool>
      </property>
-     <attribute name="horizontalHeaderVisible">
-      <bool>true</bool>
-     </attribute>
      <attribute name="horizontalHeaderStretchLastSection">
       <bool>true</bool>
      </attribute>
@@ -70,7 +78,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>HeadersTableView</class>
+   <class>UrlParamsTableView</class>
    <extends>QTableView</extends>
    <header>.request_manager.h</header>
   </customwidget>

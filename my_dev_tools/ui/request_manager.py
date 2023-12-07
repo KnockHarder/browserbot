@@ -37,7 +37,7 @@ class ReqRespFrame(QFrame):
         self.ui.basic_info_table_view.update_request(req)
         queries = url_parse.parse_qs(url_parse.urlparse(req.url).query)
         url_params = {k: v[0] if len(v) == 1 else v for k, v in queries.items()}
-        self.ui.url_params_table_view.update_params(url_params)
+        self.ui.req_url_params_frame.update_params(url_params)
         self.ui.req_headers_frame.update_headers(req.headers)
         self.ui.req_body_frame.update_body(req)
 
@@ -164,20 +164,15 @@ class ReqRespHeadersFrame(QFrame):
         from .req_resp_headers_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
-
-        table_view = self.ui.headers_table_view
-        headers_model = HeadersTableModelItem(dict(), table_view)
-        self._headers_model = headers_model
-        table_view.setModel(self._headers_model)
-        headers_model.dataChanged.connect(self.resize_contents)
-        headers_model.layoutChanged.connect(self.resize_contents)
+        self.ui.headers_table_view.horizontalHeader().sectionResized.connect(self.resize_search_widgets)
+        self.ui.headers_table_view.horizontalHeader().geometriesChanged.connect(self.resize_search_widgets)
 
     def update_headers(self, headers):
-        self._headers_model.update_headers(headers)
+        self.ui.headers_table_view.update_headers(headers)
 
-    def resize_contents(self, *_):
+    def resize_search_widgets(self, *_):
         table_view = self.ui.headers_table_view
-        table_view.resizeColumnsToContents()
+        self.ui.search_edits_area_widget.setFixedWidth(table_view.horizontalHeader().width())
         self.ui.key_search_input.setFixedWidth(table_view.columnWidth(0))
         self.ui.value_search_input.setFixedWidth(table_view.columnWidth(1))
 
@@ -188,6 +183,9 @@ class HeadersTableView(QTableView):
         self._model = HeadersTableModelItem(dict(), self)
         self.setModel(self._model)
         self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+
+    def update_headers(self, headers: dict):
+        self._model.update_headers(headers)
 
 
 class HeadersTableModelItem(QAbstractItemModel):
@@ -240,6 +238,30 @@ class HeadersTableModelItem(QAbstractItemModel):
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return ('键', '值')[section]
         return None
+
+
+class UrlParamsFrame(QFrame):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        from .req_resp_url_params_frame_uic import Ui_Frame
+        self.ui = Ui_Frame()
+        self.ui.setupUi(self)
+        self.ui.url_params_table_view.horizontalHeader().geometriesChanged.connect(self.resize_search_widgets)
+        self.ui.url_params_table_view.horizontalHeader().sectionResized.connect(self.resize_search_widgets)
+
+    def resize_search_widgets(self, *_):
+        table_view = self.ui.url_params_table_view
+        self.ui.key_search_edit.parent().setFixedWidth(table_view.columnWidth(0) + table_view.columnWidth(1))
+        self.ui.search_edits_area_widget.setFixedWidth(table_view.horizontalHeader().width())
+        self.ui.key_search_edit.setFixedWidth(table_view.columnWidth(0))
+        self.ui.value_search_edit.setFixedWidth(table_view.columnWidth(1))
+
+    def update_params(self, params: dict):
+        self.ui.url_params_table_view.update_params(params)
+
+    def params_dict(self) -> dict:
+        return self.ui.url_params_table_view.params_dict()
 
 
 class UrlParamsTableView(QTableView):
@@ -350,8 +372,8 @@ class ReqBodyFrame(QFrame):
         # find tab by text
         for idx in range(tab_widget.count()):
             widget = tab_widget.widget(idx).layout().itemAt(0).widget()
-            if tab_widget.tabText(idx) in content_type.split('/') and hasattr(widget, 'update_body'):
-                widget.update_body(req.body)
+            if tab_widget.tabText(idx) in content_type.split('/') and hasattr(widget, '__update_body__'):
+                widget.__update_body__(req.body)
                 tab_widget.setCurrentIndex(idx)
                 return
         raise self.UnsupportedContentTypeError(content_type)
@@ -359,20 +381,18 @@ class ReqBodyFrame(QFrame):
     def body_data(self) -> Any:
         tab_widget = self.ui.req_body_tab_widget
         widget = tab_widget.currentWidget()
-        if hasattr(widget, 'body_data'):
-            return widget.body_data()
-        return None
+        return widget.__body_data__()
 
 
-class UrlParamsReqBodyWidget(UrlParamsTableView):
+class UrlParamsBodyFrame(UrlParamsFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-    def update_body(self, data):
+    def __update_body__(self, data):
         params_dict = {k: v[0] if len(v) == 0 else v for k, v in url_parse.parse_qs(data).items()}
         super().update_params(params_dict)
 
-    def body_data(self) -> Any:
+    def __body_data__(self) -> Any:
         return super().params_dict()
 
 
