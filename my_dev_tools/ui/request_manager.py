@@ -39,8 +39,8 @@ class ReqRespFrame(QFrame):
         self.ui.basic_info_table_view.update_request(req)
         queries = url_parse.parse_qs(url_parse.urlparse(req.url).query)
         url_params = {k: v[0] if len(v) == 1 else v for k, v in queries.items()}
-        self.ui.req_url_params_frame.update_params(url_params)
-        self.ui.req_headers_frame.update_headers(req.headers)
+        self.ui.req_url_params_frame.update_dict(url_params)
+        self.ui.req_headers_frame.update_dict(dict(req.headers))
         self.ui.req_body_frame.update_body(req)
 
     def update_url_area(self, req: PreparedRequest):
@@ -62,7 +62,7 @@ class ReqRespFrame(QFrame):
 
     def update_response(self, resp: Response):
         self.ui.basic_info_table_view.update_response(resp)
-        self.ui.resp_headers_frame.update_headers(resp.headers)
+        self.ui.resp_headers_frame.update_dict(dict(resp.headers))
         content_type = resp.headers.get('Content-Type')
         if content_type:
             self.ui.resp_body_type_label.setText(content_type)
@@ -88,222 +88,58 @@ class ReqRespFrame(QFrame):
         self.update_response(response)
 
 
-class BasicInfoTableView(QTableView):
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self._model = BasicInfoItemModel(self)
-        self.setModel(self._model)
-        self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
-
-    def update_request(self, req: PreparedRequest):
-        self._model.update_request(req)
-
-    def update_response(self, resp: Response):
-        self._model.update_response(resp)
-
-    def update_req_start_time(self, req_start_time: datetime):
-        self._model.update_req_start_time(req_start_time)
-
-    def update_req_end_time(self, req_end_time: datetime):
-        self._model.update_req_end_time(req_end_time)
-
-
-class BasicInfoItemModel(QAbstractItemModel):
-    class Label(enum.StrEnum):
-        STATUS_CODE = '状态码'
-        STATUS_INFO = '状态信息'
-        START_TIME = '请求开始时间'
-        END_TIME = '请求结束时间'
-        RESPONSE_TIME = '响应时间'
-        SERVER = '服务器'
-        SERVER_IP = '服务器IP'
-        SERVER_PORT = '服务器端口'
-
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self.value_dict = dict[str, str]()
-
-    def update_request(self, req: PreparedRequest):
-        self.value_dict.clear()
-        parsed_url = urlparse(req.url)
-        self.value_dict[self.Label.SERVER] = parsed_url.hostname
-        self.value_dict[self.Label.SERVER_IP] = socket.gethostbyname(parsed_url.hostname)
-        self.value_dict[self.Label.SERVER_PORT] = str(parsed_url.port)
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 1))
-
-    def update_req_start_time(self, req_start_time: datetime):
-        self.value_dict[self.Label.START_TIME] = str(req_start_time)
-        if self.Label.END_TIME in self.value_dict:
-            del self.value_dict[self.Label.END_TIME]
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 1))
-
-    def update_req_end_time(self, req_end_time: datetime):
-        self.value_dict[self.Label.END_TIME] = str(req_end_time)
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 1))
-
-    def update_response(self, resp: Response):
-        self.value_dict[self.Label.STATUS_CODE] = str(resp.status_code)
-        self.value_dict[self.Label.STATUS_INFO] = str(resp.reason)
-        self.value_dict[self.Label.RESPONSE_TIME] = str(resp.elapsed)
-        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 1))
-
-    def rowCount(self, parent: QModelIndex = None) -> int:
-        return len(self.Label)
-
-    def columnCount(self, parent: QModelIndex = None) -> int:
-        return 2
-
-    def data(self, index: QModelIndex, role: int = -1) -> Any:
-        if role == Qt.ItemDataRole.DisplayRole and index.isValid():
-            label = list(self.Label)[index.row()]
-            if index.column() == 0:
-                return label
-            elif index.column() == 1:
-                return self.value_dict.get(label)
-        return None
-
-    def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
-        return self.createIndex(row, column)
-
-    def parent(self, child: QModelIndex = None) -> QModelIndex:
-        return QModelIndex()
-
-
-class ReqRespHeadersFrame(QFrame):
-
+class DictTableFrame(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        from .req_resp_headers_frame_uic import Ui_Frame
+        from .req_resp_dict_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
-        self.ui.headers_table_view.horizontalHeader().sectionResized.connect(self.resize_search_widgets)
-        self.ui.headers_table_view.horizontalHeader().geometriesChanged.connect(self.resize_search_widgets)
-
-    def update_headers(self, headers):
-        self.ui.headers_table_view.update_headers(headers)
+        self.ui.dict_tabl_view.horizontalHeader().geometriesChanged.connect(self.resize_search_widgets)
+        self.ui.dict_tabl_view.horizontalHeader().sectionResized.connect(self.resize_search_widgets)
 
     def resize_search_widgets(self, *_):
-        table_view = self.ui.headers_table_view
+        table_view = self.ui.dict_tabl_view
         self.ui.search_edits_area_widget.setFixedWidth(table_view.horizontalHeader().width())
         self.ui.key_search_input.setFixedWidth(table_view.columnWidth(0))
         self.ui.value_search_input.setFixedWidth(table_view.columnWidth(1))
 
+    def update_dict(self, data: dict):
+        self.ui.dict_tabl_view.update_dict(data)
 
-class HeadersTableView(QTableView):
+    def dict_data(self) -> dict:
+        return self.ui.dict_tabl_view.dict_data()
+
+
+class DictTableView(QTableView):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self._model = HeadersTableModelItem(dict(), self)
+        self._model = DictTableItemModel(dict(), self)
         self.setModel(self._model)
         self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
+        self._model.layoutChanged.connect(lambda *args: self.resizeColumnsToContents())
 
-    def update_headers(self, headers: dict):
-        self._model.update_headers(headers)
+    def update_dict(self, data: dict):
+        self._model.update_dict(data)
 
-
-class HeadersTableModelItem(QAbstractItemModel):
-    def __init__(self, headers: dict, parent: QWidget):
-        super().__init__(parent)
-        self.headers = headers
-
-    def update_headers(self, headers):
-        self.headers.update(headers)
-        self.layoutChanged.emit()
-
-    def rowCount(self, parent: QModelIndex = None) -> int:
-        return len(self.headers)
-
-    def columnCount(self, parent: QModelIndex = None) -> int:
-        return 2
-
-    def data(self, index: QModelIndex, role: int = -1) -> Any:
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole) and index.isValid():
-            key = self._header_key_at(index)
-            if index.column() == 0:
-                return key
-            elif index.column() == 1:
-                return self.headers[key]
-        return None
-
-    def _header_key_at(self, index):
-        key_list = list(self.headers.keys())
-        key_list.sort()
-        key = key_list[index.row()]
-        return key
-
-    def setData(self, index: QModelIndex, value: Any, role: int = -1) -> bool:
-        if role == Qt.ItemDataRole.EditRole and index.isValid():
-            key = self._header_key_at(index)
-            if index.column() == 0:
-                self.headers[value] = self.headers.pop(key)
-            elif index.column() == 1:
-                self.headers[key] = value
-            return True
-        return False
-
-    def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
-        return self.createIndex(row, column)
-
-    def parent(self, child: QModelIndex = None) -> QModelIndex:
-        return QModelIndex()
-
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return ('键', '值')[section]
-        return None
+    def dict_data(self) -> dict:
+        return self._model.dict_data
 
 
-class UrlParamsFrame(QFrame):
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-
-        from .req_resp_url_params_frame_uic import Ui_Frame
-        self.ui = Ui_Frame()
-        self.ui.setupUi(self)
-        self.ui.url_params_table_view.horizontalHeader().geometriesChanged.connect(self.resize_search_widgets)
-        self.ui.url_params_table_view.horizontalHeader().sectionResized.connect(self.resize_search_widgets)
-
-    def resize_search_widgets(self, *_):
-        table_view = self.ui.url_params_table_view
-        self.ui.key_search_edit.parent().setFixedWidth(table_view.columnWidth(0) + table_view.columnWidth(1))
-        self.ui.search_edits_area_widget.setFixedWidth(table_view.horizontalHeader().width())
-        self.ui.key_search_edit.setFixedWidth(table_view.columnWidth(0))
-        self.ui.value_search_edit.setFixedWidth(table_view.columnWidth(1))
-
-    def update_params(self, params: dict):
-        self.ui.url_params_table_view.update_params(params)
-
-    def params_dict(self) -> dict:
-        return self.ui.url_params_table_view.params_dict()
-
-
-class UrlParamsTableView(QTableView):
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self._model = UrlParamsTableModelItem(dict(), self)
-        self.setModel(self._model)
-        self._model.dataChanged.connect(lambda *args: self.resizeColumnsToContents())
-
-    def update_params(self, params: dict):
-        self._model.update_params(params)
-
-    def params_dict(self) -> dict:
-        return self._model.params
-
-
-class UrlParamsTableModelItem(QAbstractItemModel):
+class DictTableItemModel(QAbstractItemModel):
     ITEM_VALUE_TYPE_ROLE = Qt.ItemDataRole.UserRole + 1
 
-    def __init__(self, params: dict, parent: QWidget):
+    def __init__(self, data: dict, parent: QWidget):
         super().__init__(parent)
-        self.params = params
+        self.dict_data = data
+        self.editable = False
 
-    def update_params(self, params: dict):
-        self.params.update(params)
+    def update_dict(self, data: dict):
+        self.dict_data = dict(data)
         self.layoutChanged.emit()
 
     def rowCount(self, parent: QModelIndex = None) -> int:
-        return len(self.params)
+        return len(self.dict_data)
 
     def columnCount(self, parent: QModelIndex = None) -> int:
         return 2
@@ -318,11 +154,11 @@ class UrlParamsTableModelItem(QAbstractItemModel):
             elif role == self.ITEM_VALUE_TYPE_ROLE:
                 return str
         elif index.column() == 1:
-            value = self.params[key]
+            value = self.dict_data[key]
             if isinstance(value, list) and len(value) == 1:
                 value = value[0]
             if role == Qt.ItemDataRole.DisplayRole:
-                return str(value)
+                return str(value) if value else None
             elif role == Qt.ItemDataRole.EditRole:
                 return value
             elif role == self.ITEM_VALUE_TYPE_ROLE:
@@ -335,8 +171,7 @@ class UrlParamsTableModelItem(QAbstractItemModel):
         return None
 
     def _param_key_at(self, index):
-        key_list = list(self.params.keys())
-        key_list.sort()
+        key_list = list(self.dict_data.keys())
         key = key_list[index.row()]
         return key
 
@@ -344,9 +179,9 @@ class UrlParamsTableModelItem(QAbstractItemModel):
         if role == Qt.ItemDataRole.EditRole and index.isValid():
             key = self._param_key_at(index)
             if index.column() == 0:
-                self.params[value] = self.params.pop(key)
+                self.dict_data[value] = self.dict_data.pop(key)
             elif index.column() == 1:
-                self.params[key] = value
+                self.dict_data[key] = value
             else:
                 return False
             self.dataChanged.emit(index, index)
@@ -354,13 +189,63 @@ class UrlParamsTableModelItem(QAbstractItemModel):
         return False
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
-        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
+        flags = super().flags(index)
+        if self.editable:
+            flags |= Qt.ItemFlag.ItemIsEditable
+        return flags
 
     def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
         return self.createIndex(row, column)
 
     def parent(self, child: QModelIndex = None) -> QModelIndex:
         return QModelIndex()
+
+
+class BasicInfoTableView(DictTableView):
+    class Label(enum.StrEnum):
+        STATUS_CODE = '状态码'
+        STATUS_INFO = '状态信息'
+        START_TIME = '请求开始时间'
+        END_TIME = '请求结束时间'
+        RESPONSE_TIME = '响应时间'
+        SERVER = '服务器'
+        SERVER_IP = '服务器IP'
+        SERVER_PORT = '服务器端口'
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        data = dict()
+        for label in self.Label:
+            data[label] = ''
+        super().update_dict(data)
+
+    def update_request(self, req: PreparedRequest):
+        parsed_url = urlparse(req.url)
+        model = self.model()
+        model.setData(self._get_value_index(self.Label.SERVER),
+                      parsed_url.hostname, Qt.ItemDataRole.EditRole)
+        model.setData(self._get_value_index(self.Label.SERVER_IP), socket.gethostbyname(parsed_url.hostname),
+                      Qt.ItemDataRole.EditRole)
+        model.setData(self._get_value_index(self.Label.SERVER_PORT), parsed_url.port, Qt.ItemDataRole.EditRole)
+
+    def _get_value_index(self, label: Label):
+        model = self.model()
+        return model.createIndex(list(self.Label).index(label), 1)
+
+    def update_response(self, resp: Response):
+        model = self.model()
+        model.setData(self._get_value_index(self.Label.STATUS_CODE), resp.status_code, Qt.ItemDataRole.EditRole)
+        model.setData(self._get_value_index(self.Label.STATUS_INFO), resp.reason, Qt.ItemDataRole.EditRole)
+        model.setData(self._get_value_index(self.Label.RESPONSE_TIME), resp.elapsed, Qt.ItemDataRole.EditRole)
+
+    def update_req_start_time(self, req_start_time: datetime):
+        model = self.model()
+        model.setData(self._get_value_index(self.Label.START_TIME), req_start_time, Qt.ItemDataRole.EditRole)
+        model.setData(self._get_value_index(self.Label.END_TIME), None, Qt.ItemDataRole.EditRole)
+
+    def update_req_end_time(self, req_end_time: datetime):
+        model = self.model()
+        model.setData(self._get_value_index(self.Label.END_TIME), req_end_time, Qt.ItemDataRole.EditRole)
 
 
 class ReqBodyFrame(QFrame):
@@ -397,16 +282,16 @@ class ReqBodyFrame(QFrame):
         return widget.__body_data__()
 
 
-class UrlParamsBodyFrame(UrlParamsFrame):
+class DictTableBodyFrame(DictTableFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
     def __update_body__(self, data):
         params_dict = {k: v[0] if len(v) == 0 else v for k, v in url_parse.parse_qs(data).items()}
-        super().update_params(params_dict)
+        super().update_dict(params_dict)
 
     def __body_data__(self) -> Any:
-        return super().params_dict()
+        return super().dict_data()
 
 
 class JsonModelItem:

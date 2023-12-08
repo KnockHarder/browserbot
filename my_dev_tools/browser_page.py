@@ -2,7 +2,7 @@ import asyncio
 import enum
 import json
 import time
-from typing import Optional, Any
+from typing import Optional, Any, Self
 
 import requests
 import websocket
@@ -55,9 +55,10 @@ class CommandException(Exception):
 
 
 class BrowserPage:
-
-    def __init__(self, web_tool_addr: str, **kwargs):
-        self.address = web_tool_addr
+    def __init__(self, _browser, **kwargs):
+        from .browser import Browser
+        self._browser: Browser = _browser
+        self.address = self._browser.address
         self.id = kwargs['id']
         self.url: str = kwargs['url']
         self.title = kwargs['title']
@@ -66,10 +67,18 @@ class BrowserPage:
         self._ws: Optional[WebSocket] = None
         self.page_flag = PageFlag.NONE
 
+    def _update_page(self, page: Self):
+        self.url = page.url
+        self.title = page.title
+        self.websocket_url = page.websocket_url
+
     def _ensure_ws(self):
         if not self._ws:
-            self._ws: WebSocket = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
-            self._ws.ping()
+            self._create_and_init_ws()
+
+    def _create_and_init_ws(self):
+        self._ws: WebSocket = websocket.create_connection(self.websocket_url, CONNECTION_TIMEOUT)
+        self._ws.ping()
 
     def _recv(self, timeout: float) -> str:
         self._ensure_ws()
@@ -92,13 +101,17 @@ class BrowserPage:
 
     async def command_result(self, command: str, timeout: float, **params) -> dict:
         request_id = config.next_id()
-        self._ensure_ws()
         request = {
             'id': request_id,
             'method': command,
             'params': params
         }
-        self._ws.send(json.dumps(request))
+        self._ensure_ws()
+        try:
+            self._ws.send(json.dumps(request))
+        except BrokenPipeError:
+            self._create_and_init_ws()
+            self._ws.send(json.dumps(request))
         return await self._wait_response(request_id, timeout, params)
 
     async def _wait_response(self, request_id: int, timeout: float, params: dict) -> Any:

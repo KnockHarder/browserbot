@@ -33,9 +33,9 @@ class Browser:
         pages_data = requests.get(f'http://{self.address}/json').json()
         result = list[BrowserPage]()
         for data in filter(lambda x: x['type'] == 'page', pages_data):
-            page = BrowserPage(self.address, **data)
+            page = BrowserPage(self, **data)
             exists = next(iter([x for x in self._page_cache if x.id == page.id]), None)
-            result.append(exists if exists else BrowserPage(self.address, **data))
+            result.append(exists if exists else BrowserPage(self, **data))
         self._page_cache = result
         return result
 
@@ -65,6 +65,12 @@ class Browser:
         if not new_tab:
             raise TabNotFoundError('new tab', f'url={prefix}')
         return new_tab
+
+    def required_page_by_id(self, page_id) -> BrowserPage:
+        page = next(filter(lambda x: x.id == page_id, self.pages), None)
+        if not page:
+            raise TabNotFoundError('page', f'id={page_id}')
+        return page
 
 
 def main():

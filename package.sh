@@ -53,3 +53,8 @@ python3 "$SETUP_PY" py2app > py2app.log || true
 rm -rf  build || ture
 echo "Uninstall requirements"
 python3 -m pip uninstall -y -r requirements.txt > /dev/null
+
+if [ -f after_package.sh ]; then
+    echo "Run after_package.sh"
+    soucrce ./after_package.sh
+fi

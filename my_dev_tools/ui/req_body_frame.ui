@@ -49,7 +49,7 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="UrlParamsBodyFrame" name="req_headers_frame_2">
+        <widget class="DictTableBodyFrame" name="req_headers_frame_2">
          <property name="frameShape">
           <enum>QFrame::NoFrame</enum>
          </property>
@@ -69,7 +69,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>UrlParamsBodyFrame</class>
+   <class>DictTableBodyFrame</class>
    <extends>QFrame</extends>
    <header>.request_manager.h</header>
    <container>1</container>

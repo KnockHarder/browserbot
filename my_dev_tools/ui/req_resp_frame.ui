@@ -151,7 +151,7 @@ border: none;</string>
    <item>
     <widget class="QTabWidget" name="main_tab_widget">
      <property name="currentIndex">
-      <number>5</number>
+      <number>1</number>
      </property>
      <property name="documentMode">
       <bool>true</bool>
@@ -206,7 +206,7 @@ border: none;</string>
            <number>0</number>
           </property>
           <item>
-           <widget class="ReqRespHeadersFrame" name="req_headers_frame">
+           <widget class="DictTableFrame" name="req_headers_frame">
             <property name="frameShape">
              <enum>QFrame::NoFrame</enum>
             </property>
@@ -229,7 +229,7 @@ border: none;</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_8">
        <item>
-        <widget class="UrlParamsFrame" name="req_url_params_frame">
+        <widget class="DictTableFrame" name="req_url_params_frame">
          <property name="frameShape">
           <enum>QFrame::NoFrame</enum>
          </property>
@@ -287,7 +287,7 @@ border: none;</string>
            <number>0</number>
           </property>
           <item>
-           <widget class="ReqRespHeadersFrame" name="resp_headers_frame">
+           <widget class="DictTableFrame" name="resp_headers_frame">
             <property name="frameShape">
              <enum>QFrame::NoFrame</enum>
             </property>
@@ -354,13 +354,13 @@ border: none;</string>
  </widget>
  <customwidgets>
   <customwidget>
-   <class>ReqRespHeadersFrame</class>
+   <class>ReqBodyFrame</class>
    <extends>QFrame</extends>
    <header>.request_manager.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>ReqBodyFrame</class>
+   <class>DictTableFrame</class>
    <extends>QFrame</extends>
    <header>.request_manager.h</header>
    <container>1</container>
@@ -369,12 +369,6 @@ border: none;</string>
    <class>BasicInfoTableView</class>
    <extends>QTableView</extends>
    <header>.request_manager.h</header>
-  </customwidget>
-  <customwidget>
-   <class>UrlParamsFrame</class>
-   <extends>QFrame</extends>
-   <header>.request_manager.h</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>
