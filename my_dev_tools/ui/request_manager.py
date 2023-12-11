@@ -9,8 +9,11 @@ from urllib.parse import urlparse
 import requests
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView
+from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView, QBoxLayout
 from requests import Response, PreparedRequest
+
+from ..requests.curl import parse_curl
+from ..widgets import dialog as my_dialog
 
 
 def _setup_tab_widget_layout_style(tab_widget):
@@ -19,6 +22,41 @@ def _setup_tab_widget_layout_style(tab_widget):
                          map(lambda i: tab_widget.widget(i), range(tab_widget.count()))):
         widget.layout().setContentsMargins(0, 0, 0, 0)
         widget.layout().setSpacing(0)
+
+
+class ImportContentValueError(Exception):
+    def __init__(self, content: str):
+        super().__init__(content)
+
+
+class RequestManagerFrame(QFrame):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        from .request_manager_frame_uic import Ui_Frame
+        self.ui = Ui_Frame()
+        self.ui.setupUi(self)
+        while self.ui.main_tab_widget.count() > 0:
+            self.ui.main_tab_widget.removeTab(0)
+
+    @Slot()
+    def import_request(self):
+        def _do(text: str):
+            if not text:
+                raise ValueError('不可导入空内容')
+
+            text = text.strip()
+            tab_widget = self.ui.main_tab_widget
+            if text.lower().startswith('curl'):
+                req = parse_curl(text)
+                frame = ReqRespFrame(tab_widget)
+                frame.update_request(req.prepare())
+                tab_widget.addTab(frame, urlparse(req.url).path)
+                return
+            raise ImportContentValueError(text)
+
+        my_dialog.show_multi_line_input_dialog('导入请求', '内容', self,
+                                               text_value_select_callback=_do)
 
 
 class ReqRespFrame(QFrame):
@@ -100,9 +138,8 @@ class DictTableFrame(QFrame):
 
     def resize_search_widgets(self, *_):
         table_view = self.ui.dict_tabl_view
-        self.ui.search_edits_area_widget.setFixedWidth(table_view.horizontalHeader().width())
-        self.ui.key_search_input.setFixedWidth(table_view.columnWidth(0))
-        self.ui.value_search_input.setFixedWidth(table_view.columnWidth(1))
+        for column in range(table_view.horizontalHeader().count()):
+            self.ui.search_edits_layout.setStretch(column, table_view.columnWidth(column))
 
     def update_dict(self, data: dict):
         self.ui.dict_tabl_view.update_dict(data)
@@ -469,9 +506,9 @@ class JsonDataFrame(QFrame):
 
     def resize_search_widgets(self, *_):
         tree_view = self.ui.json_tree_view
-        self.ui.search_edits_area_widget.setFixedWidth(tree_view.header().width())
-        self.ui.key_search_edit.setFixedWidth(tree_view.columnWidth(0))
-        self.ui.value_search_edit.setFixedWidth(tree_view.columnWidth(1))
+        layout: QBoxLayout = self.ui.search_edits_area_widget.layout()
+        for column in range(tree_view.model().columnCount()):
+            layout.setStretch(column, tree_view.columnWidth(column))
 
     @Slot(str)
     def search(self, *_):
@@ -485,18 +522,9 @@ class JsonDataFrame(QFrame):
 
 def main():
     import sys
-    import os
     from PySide6.QtWidgets import QApplication
-    from my_dev_tools.my_request.curl import parse_curl
 
     app = QApplication()
-    with open(os.path.expanduser('~/Downloads/curl.sh')) as f:
-        command = f.read()
-
-    req = parse_curl(command)
-
-    frame = ReqRespFrame()
-    frame.update_request(req.prepare())
-    frame.setFixedSize(800, 600)
+    frame = RequestManagerFrame()
     frame.show()
     sys.exit(app.exec())
