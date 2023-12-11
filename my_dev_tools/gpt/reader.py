@@ -77,7 +77,7 @@ async def read_weixin_article(page: BrowserPage) -> Article:
     content_ele = await page.require_single_node_by_xpath('//*[@id="js_content"][1]', ARTICLE_READ_TIMEOUT)
     section = await get_paragraphs_text(content_ele, 'section')
     p = await get_paragraphs_text(content_ele, 'p')
-    title_node = await page.require_single_node_by_xpath('//h1[1]', ARTICLE_READ_TIMEOUT)
+    title_node = await page.require_single_node_by_xpath('(//h1)[1]', ARTICLE_READ_TIMEOUT)
     return Article(await title_node.text_content, p if len(p) > len(section) else section)
 
 

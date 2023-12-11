@@ -33,10 +33,18 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QLineEdit" name="key_search_input"/>
+       <widget class="QLineEdit" name="key_search_input">
+        <property name="clearButtonEnabled">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="value_search_input"/>
+       <widget class="QLineEdit" name="value_search_input">
+        <property name="clearButtonEnabled">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -76,5 +84,41 @@
   </customwidget>
  </customwidgets>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>key_search_input</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>Frame</receiver>
+   <slot>search()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>87</x>
+     <y>20</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>246</x>
+     <y>-102</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>value_search_input</sender>
+   <signal>textChanged(QString)</signal>
+   <receiver>Frame</receiver>
+   <slot>search()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>335</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>430</x>
+     <y>-89</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>search()</slot>
+ </slots>
 </ui>

@@ -2,7 +2,7 @@ import enum
 import json
 import socket
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Sequence
 from urllib import parse as url_parse
 from urllib.parse import urlparse
 
@@ -109,6 +109,19 @@ class DictTableFrame(QFrame):
 
     def dict_data(self) -> dict:
         return self.ui.dict_tabl_view.dict_data()
+
+    @Slot(str)
+    def search(self, *_):
+        tabl_view = self.ui.dict_tabl_view
+        model = tabl_view.model()
+        for row in range(model.rowCount()):
+            all_match = (self.ui.key_search_input.text().lower() in self.cell_display_value(row, 0).lower()
+                         and self.ui.value_search_input.text().lower() in self.cell_display_value(row, 1).lower())
+            tabl_view.setRowHidden(row, not all_match)
+
+    def cell_display_value(self, row: int, column: int) -> str:
+        tabl_view = self.ui.dict_tabl_view
+        return tabl_view.model().data(tabl_view.model().index(row, column), Qt.ItemDataRole.DisplayRole)
 
 
 class DictTableView(QTableView):
@@ -402,6 +415,42 @@ class JsonTreeView(QTreeView):
     def update_data(self, data: Any):
         self._model.update_data(data)
 
+    def recursively_search_columns(self, index: QModelIndex, keywords: Sequence[str]) -> bool:
+        def _match(_index: QModelIndex):
+            _text = self._model.data(_index, Qt.ItemDataRole.DisplayRole)
+            return _text and keywords[_index.column()].lower() in _text.lower()
+
+        model = self._model
+        if all(map(lambda column: _match(model.index(index.row(), column, index.parent())),
+                   range(model.columnCount(index)))):
+            self.show_all(index)
+            self.expand_self_and_collapse_children(index)
+            return True
+
+        if model.rowCount(index):
+            any_child_match = any(list(map(lambda child: self.recursively_search_columns(child, keywords),
+                                           map(lambda row: model.index(row, index.column(), index),
+                                               range(model.rowCount(index))))))
+        else:
+            any_child_match = False
+        self.setExpanded(index, any_child_match)
+        self.setRowHidden(index.row(), index.parent(), not any_child_match)
+        return any_child_match
+
+    def expand_self_and_collapse_children(self, index: QModelIndex):
+        self.expand(index)
+        model = self._model
+        children = [model.createIndex(i, index.column(), index) for i in range(model.rowCount(index))]
+        for child in children:
+            self.collapse(child)
+
+    def show_all(self, index: QModelIndex):
+        model = self._model
+        self.setRowHidden(index.row(), index.parent(), False)
+        children = [model.index(row, index.column(), index) for row in range(model.rowCount(index))]
+        for child in children:
+            self.show_all(child)
+
 
 class JsonDataFrame(QFrame):
     def __init__(self, data: Any, parent: Optional[QWidget] = None):
@@ -410,15 +459,28 @@ class JsonDataFrame(QFrame):
         from .req_resp_json_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
-        self.ui.json_tree_view.update_data(data)
-        self.ui.json_tree_view.header().sectionResized.connect(self.resize_search_widgets)
-        self.ui.json_tree_view.header().geometriesChanged.connect(self.resize_search_widgets)
+        tree_view = self.ui.json_tree_view
+        tree_view.update_data(data)
+        tree_view.header().sectionResized.connect(self.resize_search_widgets)
+        tree_view.header().geometriesChanged.connect(self.resize_search_widgets)
+
+        tree_view.expandAll()
+        tree_view.resizeColumnToContents(0)
 
     def resize_search_widgets(self, *_):
         tree_view = self.ui.json_tree_view
         self.ui.search_edits_area_widget.setFixedWidth(tree_view.header().width())
         self.ui.key_search_edit.setFixedWidth(tree_view.columnWidth(0))
         self.ui.value_search_edit.setFixedWidth(tree_view.columnWidth(1))
+
+    @Slot(str)
+    def search(self, *_):
+        tree_view = self.ui.json_tree_view
+        model: JsonItemModel = tree_view.model()
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            tree_view.recursively_search_columns(index, [self.ui.key_search_edit.text(),
+                                                         self.ui.value_search_edit.text()])
 
 
 def main():

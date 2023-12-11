@@ -93,7 +93,7 @@ class ChatGptPage:
         for node, pseudo_node in [(node, pseudo_node) for node in content_nodes for pseudo_node in node.pseudo_nodes]:
             try:
                 text = await pseudo_node.text_content
-                if text:
+                if 'before' not in text:
                     any_pseudo_text = True
                     break
             except CommandException:
