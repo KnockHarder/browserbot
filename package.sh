@@ -56,5 +56,5 @@ python3 -m pip uninstall -y -r requirements.txt > /dev/null
 
 if [ -f after_package.sh ]; then
     echo "Run after_package.sh"
-    soucrce ./after_package.sh
+    source ./after_package.sh
 fi

@@ -89,7 +89,16 @@ class GptTabFrame(QFrame):
 
     @Slot()
     def clear_chat_history(self):
-        asyncio.create_task(self.chat_page.clear_histories(), name='clear history')
+        async def _do():
+            sheet = sender.styleSheet()
+            sender.setDisabled(True)
+            sender.setStyleSheet('')
+            await self.chat_page.clear_histories()
+            sender.setDisabled(False)
+            sender.setStyleSheet(sheet)
+
+        sender = self.sender()
+        asyncio.create_task(_do(), name='clear history')
 
     @Slot()
     def load_template_for_chat(self):
@@ -238,6 +247,16 @@ class GptTabFrame(QFrame):
                 self.template_file = new_path
                 self.statusLabelTextReset.emit(f'文件更名为: {new_path}')
                 return
+
+    @Slot()
+    def read_articles(self):
+        async def _do():
+            sender.setDisabled(True)
+            await self.chat_page.read_articles()
+            sender.setDisabled(False)
+
+        sender = self.sender()
+        self._create_task(_do(), '阅读文章')
 
 
 if __name__ == '__main__':

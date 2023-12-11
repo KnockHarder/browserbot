@@ -35,7 +35,25 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
+      <widget class="QPushButton" name="pushButton_6">
+       <property name="styleSheet">
+        <string notr="true">border: none;
+color: rgba(0, 0, 0, 0);
+background-color: rgba(0, 0, 0, 0); </string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="pushButton">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>100</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="styleSheet">
         <string notr="true"/>
        </property>
@@ -45,7 +63,32 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="pushButton_4">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>100</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>阅读文章</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="pushButton_2">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>100</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="styleSheet">
         <string notr="true">QPushButton {
 	color: white;
@@ -312,7 +355,7 @@
    <slot>new_chat()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>245</x>
+     <x>694</x>
      <y>8</y>
     </hint>
     <hint type="destinationlabel">
@@ -328,12 +371,28 @@
    <slot>clear_chat_history()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>584</x>
-     <y>15</y>
+     <x>905</x>
+     <y>19</y>
     </hint>
     <hint type="destinationlabel">
      <x>722</x>
      <y>-101</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_4</sender>
+   <signal>clicked()</signal>
+   <receiver>GptTabFrame</receiver>
+   <slot>read_articles()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>746</x>
+     <y>5</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>748</x>
+     <y>-71</y>
     </hint>
    </hints>
   </connection>
@@ -349,5 +408,6 @@
   <slot>rename_template_file()</slot>
   <slot>new_chat()</slot>
   <slot>clear_chat_history()</slot>
+  <slot>read_articles()</slot>
  </slots>
 </ui>
