@@ -121,6 +121,9 @@ class PageNode:
         await self._call_function_on('function() {this.value = ""}')
         await self.page.command_result('Input.insertText', COMMAND_TIMEOUT,
                                        text=content)
+        await self.trigger_entry_key()
+
+    async def trigger_entry_key(self):
         await self.page.command_result('Input.dispatchKeyEvent', COMMAND_TIMEOUT,
                                        type='keyDown', key='Enter', code='Enter',
                                        nativeVirtualKeyCode=13, windowsVirtualKeyCode=13)

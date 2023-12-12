@@ -61,6 +61,9 @@ class ChatGptPage:
     async def _ask(self, ques: str):
         node = await self._query_single_d('//*[@id="prompt-textarea"][last()]')
         await node.submit_input(ques)
+        await node.update_node()
+        while (await node.text_content).strip():
+            await node.trigger_entry_key()
 
     async def ask_as_new_chat_and_wait(self, question: str):
         await self.ask_as_new_chat(question)

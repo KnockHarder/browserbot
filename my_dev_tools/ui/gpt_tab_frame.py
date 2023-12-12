@@ -93,9 +93,11 @@ class GptTabFrame(QFrame):
             sheet = sender.styleSheet()
             sender.setDisabled(True)
             sender.setStyleSheet('')
-            await self.chat_page.clear_histories()
-            sender.setDisabled(False)
-            sender.setStyleSheet(sheet)
+            try:
+                await self.chat_page.clear_histories()
+            finally:
+                sender.setDisabled(False)
+                sender.setStyleSheet(sheet)
 
         sender = self.sender()
         asyncio.create_task(_do(), name='clear history')
@@ -252,8 +254,10 @@ class GptTabFrame(QFrame):
     def read_articles(self):
         async def _do():
             sender.setDisabled(True)
-            await self.chat_page.read_articles()
-            sender.setDisabled(False)
+            try:
+                await self.chat_page.read_articles()
+            finally:
+                sender.setDisabled(False)
 
         sender = self.sender()
         self._create_task(_do(), '阅读文章')

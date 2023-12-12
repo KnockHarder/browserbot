@@ -6,7 +6,7 @@ from typing import Optional, Any, Self
 
 import requests
 import websocket
-from websocket import WebSocket
+from websocket import WebSocket, WebSocketException
 
 from . import config
 from .browser_dom import PageNode
@@ -109,7 +109,7 @@ class BrowserPage:
         self._ensure_ws()
         try:
             self._ws.send(json.dumps(request))
-        except BrokenPipeError:
+        except (BrokenPipeError, WebSocketException):
             self._create_and_init_ws()
             self._ws.send(json.dumps(request))
         return await self._wait_response(request_id, timeout, params)
