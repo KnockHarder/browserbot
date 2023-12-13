@@ -204,6 +204,15 @@ class BrowserPage:
         if self._ws:
             self._ws.close()
 
+    def close_connection(self):
+        if self._ws:
+            try:
+                self._ws.close()
+                self._ws.ping()
+                self._ws = None
+            except WebSocketException:
+                pass
+
 
 def main():
     pass

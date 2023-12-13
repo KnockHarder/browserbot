@@ -55,15 +55,18 @@ class Browser:
             if activate:
                 page.activate()
             return page
+        return await self.open_new(prefix, timeout)
+
+    async def open_new(self, url: str, timeout=FIND_INTERVAL) -> BrowserPage:
         old_pages = self.pages
-        requests.put(f'http://{self.address}/json/new?{quote(prefix)}')
+        requests.put(f'http://{self.address}/json/new?{quote(url)}')
         end_time = time.perf_counter() + timeout
         while len(old_pages) == len(self.pages) and time.perf_counter() < end_time:
             await asyncio.sleep(FIND_INTERVAL)
         old_ids = {x.id for x in old_pages}
         new_tab = next(iter([x for x in self.pages if x.id not in old_ids]), None)
         if not new_tab:
-            raise TabNotFoundError('new tab', f'url={prefix}')
+            raise TabNotFoundError('new tab', f'url={url}')
         return new_tab
 
     def required_page_by_id(self, page_id) -> BrowserPage:
