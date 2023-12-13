@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, Optional, Callable, Coroutine
+from typing import Any, Optional, Callable, Coroutine, Sequence
 
 from langchain import prompts
 from langchain.prompts import BasePromptTemplate
@@ -27,6 +27,12 @@ def _token_size(text: str):
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     tokens = tokenizer.tokenize(text)
     return len(tokens)
+
+
+class ArticleReader:
+    def __init__(self, prefix: str, article_content_func: Callable[[BrowserPage], Coroutine[Any, Any, Article]]):
+        self.prefix = prefix
+        self.article_content_func = article_content_func
 
 
 class ChatGptPage:
@@ -162,26 +168,31 @@ class ChatGptPage:
             question = end_content_prompt.format(caption=article.name, url=article.url, content=text)
             await self.continue_ask_and_wait(question)
 
-    async def _read_all_page_articles(self, article_url_prefix,
-                                      article_content_func: Callable[[BrowserPage], Coroutine[Any, Any, Article]]):
-        browser = get_browser()
-        page_list = browser.find_pages_by_url_prefix(article_url_prefix)
-        if not page_list:
-            return
-        while page_list:
-            page = page_list.pop()
-            article = await article_content_func(page)
+    async def _read_all_page_articles(self, readers: Sequence[ArticleReader]):
+        def _next_page_and_reader() -> (BrowserPage, ArticleReader):
+            return next(filter(lambda t: bool(t[0]),
+                               map(lambda r: (self.browser.find_page_by_url_prefix(r.prefix), r),
+                                   readers)),
+                        (None, None))
+
+        page: BrowserPage
+        reader: ArticleReader
+        page, reader = _next_page_and_reader()
+        while page:
+            article = await reader.article_content_func(page)
             article.url = page.url
             if not article.name or not article.content:
                 continue
             await self.summarize_article(article)
-            page.close()
+            await page.close_and_wait()
+            page, reader = _next_page_and_reader()
 
     async def read_articles(self):
-        await self._read_all_page_articles('https://mp.weixin.qq.com/s/', extract_weixin_article)
-        await self._read_all_page_articles('https://mp.weixin.qq.com/s?', extract_weixin_article)
-        await self._read_all_page_articles('https://www.infoq.cn/article', extract_info_q_article)
-        await self._read_all_page_articles('https://www.infoq.cn/news/', extract_info_q_article)
+        readers = [ArticleReader('https://mp.weixin.qq.com/s/', extract_weixin_article),
+                   ArticleReader('https://mp.weixin.qq.com/s?', extract_weixin_article),
+                   ArticleReader('https://www.infoq.cn/article', extract_info_q_article),
+                   ArticleReader('https://www.infoq.cn/news/', extract_info_q_article)]
+        await self._read_all_page_articles(readers)
 
 
 def main():

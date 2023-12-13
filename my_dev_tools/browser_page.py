@@ -91,6 +91,11 @@ class BrowserPage:
             self._ws.close()
         requests.get(f'http://{self.address}/json/close/{self.id}')
 
+    async def close_and_wait(self):
+        self.close()
+        while self.id in [x.id for x in self._browser.pages]:
+            await asyncio.sleep(0.1)
+
     def activate(self):
         requests.get(f'http://{self.address}/json/activate/{self.id}')
 

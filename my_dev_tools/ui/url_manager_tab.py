@@ -220,8 +220,12 @@ class UrlTableView(QTableView):
 
     def edit_row_if_inserted_single(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int):
         if start == end:
-            self.setCurrentIndex(self.model().index(start, UrlTableItemModel.CATEGORY_COLUMN, parent))
-            self.edit(self.model().index(start, UrlTableItemModel.CATEGORY_COLUMN, parent))
+            category_index = self.model().index(start, UrlTableItemModel.CATEGORY_COLUMN, parent)
+            self.setCurrentIndex(category_index)
+            if start > 0:
+                pre_line_data = self.model().itemData(self.model().index(start - 1, UrlTableItemModel.CATEGORY_COLUMN))
+                self.model().setItemData(category_index, pre_line_data)
+            self.edit(category_index)
 
     def rowsAboutToBeRemoved(self, parent: Union[QModelIndex, QPersistentModelIndex], start: int, end: int) -> None:
         for row in range(start, end + 1):
@@ -239,6 +243,7 @@ class UrlTableView(QTableView):
     def init_menu(self):
         menu = self.menu = QMenu(self)
         menu.addAction('Open Links Selected').triggered.connect(self.open_selected_urls)
+        menu.addAction('Copy Links Selected').triggered.connect(self.copy_selected_urls)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(lambda position: menu.exec(
             self.viewport().mapToGlobal(position)))
@@ -249,6 +254,15 @@ class UrlTableView(QTableView):
             url = idx.data(UrlTableItemModel.LINK_ITEM_ROLE)
             if url:
                 asyncio.create_task(self.browser.find_or_open(url, activate=True), name='Open Selected')
+
+    def copy_selected_urls(self):
+        indexes = self.selectedIndexes()
+        urls = list()
+        for idx in indexes:
+            url = idx.data(UrlTableItemModel.LINK_ITEM_ROLE)
+            if url:
+                urls.append(url)
+        QApplication.clipboard().setText('\n'.join(urls))
 
 
 class UrlTableItemModel(QAbstractItemModel):
