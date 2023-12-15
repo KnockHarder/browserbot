@@ -12,13 +12,20 @@ def parse_curl(command: str) -> Request:
     _set_url_and_params(req, args.url)
     _set_headers(req, args)
     _set_url_encode_data(args, req)
+    if req.data:
+        req.method = 'POST'
     return req
 
 
 def _set_url_and_params(req: Request, url: str):
     parsed_url = url_parse.urlparse(url)
     req.url = parsed_url.scheme + '://' + parsed_url.netloc + parsed_url.path
-    req.params = {k: v[0] if len(v) == 1 else v for k, v in url_parse.parse_qs(parsed_url.query).items()}
+    param_dict = url_parse.parse_qs(parsed_url.query, keep_blank_values=True)
+    req.params = {k: v[0] if len(v) == 1 else v for k, v in param_dict.items()}
+
+
+class CurlParserError(Exception):
+    pass
 
 
 def _parse_args(command) -> argparse.Namespace:
@@ -26,10 +33,13 @@ def _parse_args(command) -> argparse.Namespace:
     parser.add_argument('command')
     parser.add_argument('url')
     parser.add_argument('--location', dest='follow_redirect', action='store_true', default=False)
+    parser.add_argument('--compressed', dest='compressed', action='store_true', default=False)
     parser.add_argument('-X', '--myrequest', dest='method', default='GET')
     parser.add_argument('-H', '--header', dest='headers', action='append', default=[])
-    parser.add_argument('--data-urlencode', dest='data_urlencode', action='append', default=[])
-    args = parser.parse_args(shlex.split(command.replace('\n', '')))
+    parser.add_argument('--data-urlencode', '-d', '--data', dest='data_url_encode', action='append', default=[])
+    args, argv = parser.parse_known_args(shlex.split(command.replace('\n', '')))
+    if argv:
+        raise CurlParserError(f'Unknown arguments: {argv}')
     return args
 
 
@@ -44,21 +54,20 @@ def _set_headers(req: Request, args: argparse.Namespace):
 
 def _set_url_encode_data(args, req):
     form_params = dict()
-    for raw_data in args.data_urlencode:
-        parts = raw_data.split('=')
-        form_params[parts[0].strip()] = '='.join(parts[1:]).strip()
+    for raw_data in args.data_url_encode:
+        raw_dict = url_parse.parse_qs(raw_data, keep_blank_values=True)
+        for k, v in raw_dict.items():
+            values = form_params[k] if k in form_params else []
+            form_params[k] = values
+            if isinstance(v, list):
+                values.extend(v)
+            else:
+                values.append(v)
+    form_params = {k: v[0] if len(v) == 1 else v for k, v in form_params.items()}
     if form_params:
         req.data = url_parse.urlencode(form_params)
+        req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
 
 
 def main():
-    with open(os.path.expanduser('~/Downloads/curl.sh')) as f:
-        command = f.read()
-    req = parse_curl(command)
-    raw = req.data
-    parsed = url_parse.parse_qs(raw)
-    print(parsed)
-
-
-if __name__ == '__main__':
-    main()
+    pass

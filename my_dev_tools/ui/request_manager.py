@@ -75,7 +75,7 @@ class ReqRespFrame(QFrame):
         self._req = req
         self.update_url_area(req)
         self.ui.basic_info_table_view.update_request(req)
-        queries = url_parse.parse_qs(url_parse.urlparse(req.url).query)
+        queries = url_parse.parse_qs(url_parse.urlparse(req.url).query, keep_blank_values=True)
         url_params = {k: v[0] if len(v) == 1 else v for k, v in queries.items()}
         self.ui.req_url_params_frame.update_dict(url_params)
         self.ui.req_headers_frame.update_dict(dict(req.headers))
@@ -337,7 +337,8 @@ class DictTableBodyFrame(DictTableFrame):
         super().__init__(parent)
 
     def __update_body__(self, data):
-        params_dict = {k: v[0] if len(v) == 0 else v for k, v in url_parse.parse_qs(data).items()}
+        params_dict = {k: v[0] if len(v) == 0 else v
+                       for k, v in url_parse.parse_qs(data, keep_blank_values=True).items()}
         super().update_dict(params_dict)
 
     def __body_data__(self) -> Any:
