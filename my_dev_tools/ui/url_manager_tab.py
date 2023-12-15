@@ -418,7 +418,11 @@ class UrlColumnItemDelegate(QAbstractItemDelegate):
     def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
                              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         rect: QRect = option.rect
-        editor.move(rect.topLeft())
+        view: QTableView = self.parent()
+        max_y = (view.maximumViewportSize().height()
+                 - view.contentsMargins().top() - view.contentsMargins().bottom()
+                 - editor.sizeHint().height())
+        editor.move(rect.left(), min(rect.top(), max_y))
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         option.features |= QStyleOptionViewItem.ViewItemFeature.HasDisplay
