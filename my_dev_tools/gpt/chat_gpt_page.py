@@ -35,6 +35,10 @@ class ArticleReader:
         self.article_content_func = article_content_func
 
 
+class GptArticleReadError(Exception):
+    pass
+
+
 class ChatGptPage:
 
     def __init__(self, browser: Optional[Browser] = None):
@@ -50,15 +54,18 @@ class ChatGptPage:
 
     async def activate(self):
         page = await self.ensure_page()
-        await page.activate()
+        page.activate()
 
     async def _query_single_d(self, xpath: str) -> PageNode:
         page = await self.ensure_page()
         return await page.require_single_node_by_xpath(xpath, FIND_NODE_TIMEOUT)
 
     async def new_chat(self):
-        node = await self._query_single_d('(//span//button[contains(@class, "text-token-text-primary")])[last()]')
-        await node.js_click()
+        page = await self.ensure_page()
+        nodes = await page.require_nodes_by_xpath(
+            '//div[text()="New chat"]/..//button[contains(@class, "text-token-text-primary")]', FIND_NODE_TIMEOUT)
+        await nodes[0].js_click()
+        await page.query_nodes_by_xpath('//div[text()="How can I help you today?"]', FIND_NODE_TIMEOUT)
 
     async def ask_as_new_chat(self, ques: str):
         await self.new_chat()
@@ -182,7 +189,7 @@ class ChatGptPage:
             article = await reader.article_content_func(page)
             article.url = page.url
             if not article.name or not article.content:
-                continue
+                raise GptArticleReadError(f'Article name or content is empty: {article}')
             await self.summarize_article(article)
             await page.close_and_wait()
             page, reader = _next_page_and_reader()
@@ -197,8 +204,4 @@ class ChatGptPage:
 
 def main():
     page = ChatGptPage()
-    asyncio.get_event_loop().run_until_complete(page.clear_histories())
-
-
-if __name__ == '__main__':
-    main()
+    asyncio.run(page.new_chat())

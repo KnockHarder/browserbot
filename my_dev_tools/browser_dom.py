@@ -1,7 +1,10 @@
 import enum
-from typing import Any, Optional
+from typing import Any, Optional, Self, TYPE_CHECKING
 
 from bs4 import BeautifulSoup
+
+if TYPE_CHECKING:
+    from .browser_page import BrowserPage
 
 COMMAND_TIMEOUT = 1
 
@@ -21,17 +24,18 @@ class JsExecuteException(Exception):
 
 
 class PageNode:
+    _node_id: int = 0
     name: str
     child_count: int
     _attributes: dict
     _pseudo_type: str
-    _outer_html: Optional[str]
-    _object: Optional[dict]
+    _outer_html: Optional[str] = None
+    _object: Optional[dict] = None
+    _parent_node: Optional[Self] = None
 
     def __init__(self, page: "BrowserPage", x_path: str, **kwargs):
         self.page = page
         self.x_path = x_path
-        self.id: int = kwargs['nodeId']
         self.backend_id: int = kwargs['backendNodeId']
         self._update_node_info(kwargs)
 
@@ -43,16 +47,19 @@ class PageNode:
         self._pseudo_type = node_result.get('pseudoType')
         nodes_data = node_result.get('pseudoElements')
         self.pseudo_nodes = [PageNode(self.page, '', **data) for data in (nodes_data if nodes_data else [])]
-        self._outer_html = None
-        self._object = None
 
     async def update_node(self):
-        result = await self.describe_node()
-        self._update_node_info(result['node'])
+        node_info = await self._describe_node(backend_id=self.backend_id)
+        self._update_node_info(node_info)
 
-    async def describe_node(self):
-        return await self.page.command_result('DOM.describeNode', COMMAND_TIMEOUT,
-                                              backendNodeId=self.backend_id)
+    async def _describe_node(self, *, node_id: int = 0, backend_id: int = 0):
+        params = dict()
+        if node_id:
+            params['nodeId'] = node_id
+        if backend_id:
+            params['backendNodeId'] = backend_id
+        result = await self.page.command_result('DOM.describeNode', COMMAND_TIMEOUT, **params)
+        return result['node']
 
     def prop_value(self, name: str) -> Any:
         return self._attributes.get(name)
@@ -63,13 +70,17 @@ class PageNode:
     async def set_props(self, kv_dict: Optional[dict] = None, **kwargs):
         kv_dict = dict(**kv_dict) if kv_dict else dict()
         kv_dict.update(kwargs)
-        result = await self.page.command_result('DOM.pushNodesByBackendIdsToFrontend', COMMAND_TIMEOUT,
-                                                backendNodeIds=[self.backend_id])
-        node_id = result['nodeIds'][0]
+        await self._ensure_node_id()
         for name, value in kv_dict.items():
             await self.page.command_result('DOM.setAttributeValue', COMMAND_TIMEOUT,
-                                           nodeId=node_id, name=name, value=value)
+                                           nodeId=self._node_id, name=name, value=value)
         await self.update_node()
+
+    async def _ensure_node_id(self):
+        if not self._node_id:
+            result = await self.page.command_result('DOM.pushNodesByBackendIdsToFrontend', COMMAND_TIMEOUT,
+                                                    backendNodeIds=[self.backend_id])
+            self._node_id = result['nodeIds'][0]
 
     @property
     def pseudo_type(self) -> Optional[NodePseudoType]:
@@ -94,6 +105,16 @@ class PageNode:
                                                     backendNodeId=self.backend_id)
             self._object = result['object']
         return self._object['objectId']
+
+    @property
+    async def parent(self) -> Optional[Self]:
+        if self.name == 'html':
+            return None
+        if not self._parent_node:
+            nodes = await self.page.query_nodes_by_xpath(f'{self.x_path}/..', COMMAND_TIMEOUT)
+            if nodes:
+                self._parent_node = nodes[0]
+        return self._parent_node if self._parent_node.backend_id else None
 
     async def js_click(self):
         result = await self._call_function_on('function() {this.click()}')
@@ -132,8 +153,15 @@ class PageNode:
         await self.page.command_result('DOM.scrollIntoViewIfNeeded', COMMAND_TIMEOUT,
                                        backendNodeId=self.backend_id)
 
+    async def traceback_node(self) -> list[Self]:
+        node = self
+        path_trace = [node]
+        while node:
+            node = await node.parent
+            if node:
+                path_trace.append(node)
+        return path_trace
 
-if __name__ == '__main__':
-    from browser_page import BrowserPage
 
-    _ = BrowserPage
+def main():
+    pass

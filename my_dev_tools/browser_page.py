@@ -169,11 +169,17 @@ class BrowserPage:
 
     async def query_nodes_by_xpath(self, xpath: str, timeout: float) -> list[PageNode]:
         end_time = time.perf_counter() + timeout
+        e: Optional[CommandException] = None
         while True:
             try:
                 nodes = await self._query_by_xpath(xpath, end_time - time.perf_counter())
+            except CommandException as e:
+                nodes = []
             except TimeoutError:
-                return []
+                if e:
+                    raise e
+                else:
+                    return []
             if nodes or time.perf_counter() > end_time:
                 return nodes
             await asyncio.sleep(NODE_FIND_LOOP_INTERVAL)

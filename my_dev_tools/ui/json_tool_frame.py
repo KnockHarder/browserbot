@@ -114,6 +114,7 @@ class JsonViewerFrame(QFrame):
     JSON_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
     jsonPathChanged = Signal(str)
     messageChanged = Signal(str)
+    jsonChanged = Signal()
     refresh_task: CancelableTask = None
 
     def __init__(self, parent: Optional[QWidget] = None, *,
@@ -149,6 +150,7 @@ class JsonViewerFrame(QFrame):
                 return
             if not isinstance(data, Coroutine):
                 _set_data_then_fresh(data)
+                self.jsonChanged.emit()
                 return
             refresh_btn.setText('取消刷新')
             self.refresh_task = CancelableTask.create_task(f'refresh-json-{self.data_func.__name__}',
@@ -157,6 +159,7 @@ class JsonViewerFrame(QFrame):
 
         async def _wait_data_then_refresh(future: Coroutine):
             _set_data_then_fresh(await future)
+            self.jsonChanged.emit()
 
         def _set_data_then_fresh(data: Any):
             if not data:
@@ -324,7 +327,3 @@ def main():
     app.lastWindowClosed.connect(lambda: future.set_result(True))
     asyncio.get_event_loop().run_until_complete(future)
     sys.exit(app.exec())
-
-
-if __name__ == '__main__':
-    main()
