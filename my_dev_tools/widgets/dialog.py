@@ -14,6 +14,7 @@ def show_input_dialog(title: str, label: str, parent: Optional[QWidget] = None, 
                                   text_value_selected_func=text_value_select_callback,
                                   window_modal=window_modal)
     dialog.open()
+    dialog.raise_()
 
 
 def _create_input_dialog(title: str, parent: Optional[QWidget] = None, *,

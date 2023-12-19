@@ -1,7 +1,7 @@
 import enum
-from typing import Any, Optional, Self, TYPE_CHECKING
+from typing import Any, Optional, Self, TYPE_CHECKING, Type
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 if TYPE_CHECKING:
     from .browser_page import BrowserPage
@@ -97,6 +97,13 @@ class PageNode:
     @property
     async def text_content(self) -> str:
         return BeautifulSoup(await self.outer_html, 'html.parser').text
+
+    @property
+    async def inner_text(self) -> str:
+        tag = BeautifulSoup(await self.outer_html, 'html.parser').contents[0]
+        if not isinstance(tag, Tag):
+            return ''
+        return ''.join([x for x in tag.children if isinstance(x, NavigableString)])
 
     @property
     async def object_id(self) -> str:
