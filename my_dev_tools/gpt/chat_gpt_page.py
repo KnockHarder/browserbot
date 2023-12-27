@@ -48,8 +48,9 @@ class ChatGptPage:
         self._page: Optional[BrowserPage] = None
 
     async def ensure_page(self):
-        if not self._page:
-            self._page = await self.browser.find_or_open(HOME_PAGE)
+        found = await self.browser.find_or_open(HOME_PAGE)
+        if not self._page or self._page.id != found.id:
+            self._page = found
         return self._page
 
     async def activate(self):

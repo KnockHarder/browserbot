@@ -17,11 +17,6 @@ generate_rc_py() {
   echo "qrc generate for $RC_FILE"
 }
 
-find . -name "*_rc.py" -exec rm {} +
-for FILE in $(find . -name '*.qrc' -exec sh -c 'echo "$0"' {} \;); do
-  generate_rc_py "$FILE"
-done
-
 generate_uic_py() {
   UI_FILE=$1
   UI_PY_FILE=${UI_FILE%.*}_uic.py
@@ -29,32 +24,46 @@ generate_uic_py() {
   echo "uic generate for $UI_FILE"
 }
 
-find . -name "*_uic.py" -exec rm {} +
-for FILE in $(find . -name '*.ui' -exec sh -c 'echo "$0"' {} \;)
-do
-  generate_uic_py "$FILE"
-done
-find . -depth 2 -name '*_uic.py' -exec sed -E -i -e 's/import ([a-zA-Z]+_rc)/from . import \1/g' {} +
-find . -depth 3 -name '*_uic.py' -exec sed -E -i -e 's/import ([a-zA-Z]+_rc)/from .. import \1/g' {} +
-find . -name '*.py-e' -exec rm {} +
+regenerate_qt_files() {
+  cd "$projectDir"
+
+  find . -name "*_rc.py" -exec rm {} +
+  for FILE in $(find . -name '*.qrc' -exec sh -c 'echo "$0"' {} \;); do
+    generate_rc_py "$FILE"
+  done
+
+  find . -name "*_uic.py" -exec rm {} +
+  for FILE in $(find . -name '*.ui' -exec sh -c 'echo "$0"' {} \;)
+  do
+    generate_uic_py "$FILE"
+  done
+  find . -depth 2 -name '*_uic.py' -exec sed -E -i -e 's/import ([a-zA-Z]+_rc)/from . import \1/g' {} +
+  find . -depth 3 -name '*_uic.py' -exec sed -E -i -e 's/import ([a-zA-Z]+_rc)/from .. import \1/g' {} +
+  find . -name '*.py-e' -exec rm {} +
+}
+
+package_with_setup() {
+  cd "$projectDir"
+  SETUP_PY=$(find . -name 'setup.py' | head -n 1)
+  if [ -z "$SETUP_PY" ]; then
+      echo "setup.py not found"
+      exit 1
+  fi
+  echo "Package with $SETUP_PY"
+  pipenv clean
+  echo "Install requirements"
+  python3 -m pip install -r requirements.txt > /dev/null
+  python3 "$SETUP_PY" py2app > py2app.log || true
+  rm -rf  build || ture
+  echo "Uninstall requirements"
+  python3 -m pip uninstall -y -r requirements.txt > /dev/null
+
+  if [ -f after_package.sh ]; then
+      echo "Run after_package.sh"
+      source ./after_package.sh || ture
+  fi
+}
 
 
-cd "$projectDir"
-SETUP_PY=$(find . -name 'setup.py' | head -n 1)
-if [ -z "$SETUP_PY" ]; then
-    echo "setup.py not found"
-    exit 1
-fi
-echo "Package with $SETUP_PY"
-pipenv clean
-echo "Install requirements"
-python3 -m pip install -r requirements.txt > /dev/null
-python3 "$SETUP_PY" py2app > py2app.log || true
-rm -rf  build || ture
-echo "Uninstall requirements"
-python3 -m pip uninstall -y -r requirements.txt > /dev/null
-
-if [ -f after_package.sh ]; then
-    echo "Run after_package.sh"
-    source ./after_package.sh || ture
-fi
+regenerate_qt_files
+package_with_setup
