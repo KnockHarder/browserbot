@@ -1,15 +1,19 @@
+import asyncio
 import enum
 import json
 import socket
+from asyncio import AbstractEventLoop
 from datetime import datetime
+from io import BytesIO
+from threading import Thread
 from typing import Optional, Any, Sequence
 from urllib import parse as url_parse
 from urllib.parse import urlparse
 
-import requests
-from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot
+import aiohttp
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot, QPoint
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView, QBoxLayout
+from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView, QBoxLayout, QMenu, QApplication
 from requests import Response, PreparedRequest
 
 from ..requests.curl import parse_curl
@@ -32,12 +36,18 @@ class ImportContentValueError(Exception):
 class RequestManagerFrame(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self._http_event_loop: AbstractEventLoop = asyncio.new_event_loop()
+        Thread(name="request-manager-http-thread", target=self._http_thread_event_loop, daemon=True).start()
 
         from .request_manager_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
         while self.ui.main_tab_widget.count() > 0:
             self.ui.main_tab_widget.removeTab(0)
+
+    def _http_thread_event_loop(self):
+        asyncio.set_event_loop(self._http_event_loop)
+        self._http_event_loop.run_forever()
 
     @Slot()
     def import_request(self):
@@ -49,9 +59,10 @@ class RequestManagerFrame(QFrame):
             tab_widget = self.ui.main_tab_widget
             if text.lower().startswith('curl'):
                 req = parse_curl(text)
-                frame = ReqRespFrame(tab_widget)
+                frame = ReqRespFrame(self._http_event_loop, tab_widget)
                 frame.update_request(req.prepare())
-                tab_widget.addTab(frame, urlparse(req.url).path)
+                index = tab_widget.addTab(frame, urlparse(req.url).path)
+                tab_widget.setCurrentIndex(index)
                 return
             raise ImportContentValueError(text)
 
@@ -62,8 +73,9 @@ class RequestManagerFrame(QFrame):
 class ReqRespFrame(QFrame):
     _req: PreparedRequest
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, _http_event_loop: AbstractEventLoop, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self._http_event_loop = _http_event_loop
 
         from .req_resp_frame_uic import Ui_ReqRespFrame
         self.ui = Ui_ReqRespFrame()
@@ -113,17 +125,39 @@ class ReqRespFrame(QFrame):
                         item.widget().deleteLater()
                 layout.addWidget(JsonDataFrame(data, self.ui.resp_body_area_widget))
 
-    @property
-    def request(self):
-        return self._req  # todo
-
     @Slot()
     def send_request(self):
-        req = self.request
+        async def _request():
+            try:
+                future = asyncio.run_coroutine_threadsafe(_send(), self._http_event_loop)
+                while not future.done():
+                    await asyncio.sleep(0.1)
+                self.ui.basic_info_table_view.update_req_end_time(datetime.now())
+                self.update_response(future.result())
+            finally:
+                self.ui.send_btn.setEnabled(True)
+
+        async def _send() -> Response:
+            req = self._req
+            async with aiohttp.request(req.method, req.url, headers=req.headers, data=req.body) as aio_response:
+                return await _covert_response(req, aio_response)
+
+        async def _covert_response(req: PreparedRequest, aio_response: aiohttp.ClientResponse) -> Response:
+            response = Response()
+            response.status_code = aio_response.status
+            response.headers = aio_response.headers
+            response.raw = BytesIO(await aio_response.content.read())
+            response.url = aio_response.url
+            response.encoding = aio_response.charset
+            response.history = [_covert_response(req, x) for x in aio_response.history]
+            response.reason = aio_response.reason
+            response.cookies = aio_response.cookies
+            response.request = req
+            return response
+
+        self.ui.send_btn.setDisabled(True)
         self.ui.basic_info_table_view.update_req_start_time(datetime.now())
-        response = requests.request(req.method, req.url, headers=req.headers, data=req.body)
-        self.ui.basic_info_table_view.update_req_end_time(datetime.now())
-        self.update_response(response)
+        asyncio.create_task(_request(), name='request-manager-send-request-task')
 
 
 class DictTableFrame(QFrame):
@@ -449,6 +483,7 @@ class JsonTreeView(QTreeView):
         self._model = JsonItemModel(self, None)
         self.setModel(self._model)
         self._model.dataChanged.connect(lambda *args: self.resizeColumnToContents(0))
+        self.setup_menu()
 
     def update_data(self, data: Any):
         self._model.update_data(data)
@@ -461,7 +496,7 @@ class JsonTreeView(QTreeView):
         model = self._model
         if all(map(lambda column: _match(model.index(index.row(), column, index.parent())),
                    range(model.columnCount(index)))):
-            self.show_all(index)
+            self.set_all_show_able(index)
             self.expand_self_and_collapse_children(index)
             return True
 
@@ -482,12 +517,55 @@ class JsonTreeView(QTreeView):
         for child in children:
             self.collapse(child)
 
-    def show_all(self, index: QModelIndex):
+    def set_all_show_able(self, index: QModelIndex):
         model = self._model
         self.setRowHidden(index.row(), index.parent(), False)
         children = [model.index(row, index.column(), index) for row in range(model.rowCount(index))]
         for child in children:
-            self.show_all(child)
+            self.set_all_show_able(child)
+
+    def show_children(self, index: QModelIndex):
+        model = self._model
+        children = [model.index(row, index.column(), index) for row in range(model.rowCount(index))]
+        self.expand(index)
+        for child in children:
+            self.setRowHidden(child.row(), child.parent(), False)
+            self.collapse(child)
+
+    def setup_menu(self):
+        def _popup_item_menu(pos: QPoint):
+            index = self.indexAt(pos)
+            if not (index and index.isValid()):
+                return
+            menu = QMenu(self)
+            menu.addAction('Copy').triggered.connect(
+                lambda: _copy_to_clipboard(self.model().data(index, Qt.ItemDataRole.EditRole)))
+            menu.addAction('Show Children').triggered.connect(lambda: self.show_children(index))
+            item = index.internalPointer()
+            if isinstance(item, JsonModelItem):
+                menu.addAction("Copy JSON Value").triggered.connect(lambda: _copy_to_clipboard(item.value))
+                menu.addAction("Show Value As New Frame").triggered.connect(
+                    lambda: _show_value_as_new_frame(item.key, item.value))
+            menu.exec(self.mapToGlobal(pos))
+            menu.deleteLater()
+
+        def _copy_to_clipboard(content):
+            if isinstance(content, list) or isinstance(content, dict):
+                content = json.dumps(content, indent=2, ensure_ascii=False)
+            else:
+                content = str(content)
+            QApplication.clipboard().setText(content)
+
+        def _show_value_as_new_frame(json_key, json_value: Any):
+            frame = JsonDataFrame(json_value, self)
+            frame.setWindowFlag(Qt.WindowType.Window)
+            frame.setWindowTitle(f'响应体: key={json_key}')
+            frame.setFixedSize(800, 600)
+            frame.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+            frame.show()
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(_popup_item_menu)
 
 
 class JsonDataFrame(QFrame):
