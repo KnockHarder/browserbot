@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 from PySide6.QtCore import QAbstractItemModel, QModelIndex, Qt, Slot, QPoint
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView, QBoxLayout, QMenu, QApplication
 from requests import Response, PreparedRequest
 
@@ -44,6 +44,7 @@ class RequestManagerFrame(QFrame):
         self.ui.setupUi(self)
         while self.ui.main_tab_widget.count() > 0:
             self.ui.main_tab_widget.removeTab(0)
+        self.init_shortcuts()
 
     def _http_thread_event_loop(self):
         asyncio.set_event_loop(self._http_event_loop)
@@ -68,6 +69,10 @@ class RequestManagerFrame(QFrame):
 
         my_dialog.show_multi_line_input_dialog('导入请求', '内容', self,
                                                text_value_select_callback=_do)
+
+    def init_shortcuts(self):
+        for i in range(1, 11):
+            QShortcut(f'Alt+{i % 10}', self, lambda _i=i: self.ui.main_tab_widget.setCurrentIndex(_i - 1))
 
 
 class ReqRespFrame(QFrame):
@@ -320,7 +325,6 @@ class BasicInfoTableView(DictTableView):
         model = self.model()
         model.setData(self._get_value_index(self.Label.STATUS_CODE), resp.status_code, Qt.ItemDataRole.EditRole)
         model.setData(self._get_value_index(self.Label.STATUS_INFO), resp.reason, Qt.ItemDataRole.EditRole)
-        model.setData(self._get_value_index(self.Label.RESPONSE_TIME), resp.elapsed, Qt.ItemDataRole.EditRole)
 
     def update_req_start_time(self, req_start_time: datetime):
         model = self.model()
@@ -330,6 +334,9 @@ class BasicInfoTableView(DictTableView):
     def update_req_end_time(self, req_end_time: datetime):
         model = self.model()
         model.setData(self._get_value_index(self.Label.END_TIME), req_end_time, Qt.ItemDataRole.EditRole)
+        start_time = self.model().data(self._get_value_index(self.Label.START_TIME), Qt.ItemDataRole.EditRole)
+        diff = req_end_time - start_time
+        model.setData(self._get_value_index(self.Label.RESPONSE_TIME), diff, Qt.ItemDataRole.EditRole)
 
 
 class ReqBodyFrame(QFrame):
