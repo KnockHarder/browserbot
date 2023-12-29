@@ -42,8 +42,10 @@ class RequestManagerFrame(QFrame):
         from .request_manager_frame_uic import Ui_Frame
         self.ui = Ui_Frame()
         self.ui.setupUi(self)
-        while self.ui.main_tab_widget.count() > 0:
-            self.ui.main_tab_widget.removeTab(0)
+        tab_widget = self.ui.main_tab_widget
+        while tab_widget.count() > 0:
+            tab_widget.removeTab(0)
+        tab_widget.tabCloseRequested.connect(tab_widget.removeTab)
         self.init_shortcuts()
 
     def _http_thread_event_loop(self):

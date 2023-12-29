@@ -4,7 +4,6 @@ from typing import Any, Optional, Callable, Coroutine, Sequence
 
 from langchain import prompts
 from langchain.prompts import BasePromptTemplate
-from transformers import AutoTokenizer
 
 from .reader import Article, extract_weixin_article, extract_info_q_article
 from ..browser import Browser, get_browser
@@ -24,6 +23,7 @@ class UnsupportedArticleUrlPrefix(Exception):
 def _token_size(text: str):
     if not text:
         return 0
+    from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     tokens = tokenizer.tokenize(text)
     return len(tokens)

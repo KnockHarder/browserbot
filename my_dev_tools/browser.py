@@ -35,9 +35,21 @@ class Browser:
         for data in filter(lambda x: x['type'] == 'page', pages_data):
             page = BrowserPage(self, **data)
             exists = next(iter([x for x in self._page_cache if x.id == page.id]), None)
-            result.append(exists if exists else BrowserPage(self, **data))
+            if exists:
+                self._update_page(exists, page)
+                result.append(exists)
+            else:
+                result.append(page)
         self._page_cache = result
         return result
+
+    @staticmethod
+    def _update_page(page: BrowserPage, info: BrowserPage):
+        page.url = info.url
+        page.title = info.title
+        if page.websocket_url != info.websocket_url:
+            page.close_connection()
+        page.websocket_url = info.websocket_url
 
     def find_pages_by_url_prefix(self, url_prefix) -> list[BrowserPage]:
         return [x for x in self.pages if x.url.startswith(url_prefix)]

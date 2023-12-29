@@ -68,15 +68,7 @@ class BrowserPage:
         self.page_flag = PageFlag.NONE
 
     def update(self):
-        page = self._browser.required_page_by_id(self.id)
-        self._update(page)
-
-    def _update(self, page: Self):
-        self.url = page.url
-        self.title = page.title
-        if self.websocket_url != page.websocket_url:
-            self.close_connection()
-        self.websocket_url = page.websocket_url
+        return self._browser.required_page_by_id(self.id)
 
     def _ensure_ws(self):
         if not self._ws:
