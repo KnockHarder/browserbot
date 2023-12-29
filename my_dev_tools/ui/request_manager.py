@@ -16,7 +16,7 @@ from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import QFrame, QWidget, QTableView, QTreeView, QBoxLayout, QMenu, QApplication
 from requests import Response, PreparedRequest
 
-from ..requests.curl import parse_curl
+from ..requests.curl import parse_curl, curl_command_from_request
 from ..widgets import dialog as my_dialog
 
 
@@ -163,6 +163,11 @@ class ReqRespFrame(QFrame):
         self.ui.send_btn.setDisabled(True)
         self.ui.basic_info_table_view.update_req_start_time(datetime.now())
         asyncio.create_task(_request(), name='request-manager-send-request-task')
+
+    @Slot()
+    def copy_request_as_curl(self):
+        curl = curl_command_from_request(self._req)
+        QApplication.clipboard().setText(curl)
 
 
 class DictTableFrame(QFrame):
@@ -587,7 +592,7 @@ class JsonDataFrame(QFrame):
         tree_view.header().sectionResized.connect(self.resize_search_widgets)
         tree_view.header().geometriesChanged.connect(self.resize_search_widgets)
 
-        tree_view.expandAll()
+        tree_view.expand_self_and_collapse_children(tree_view.model().index(0, 0))
         tree_view.resizeColumnToContents(0)
 
     def resize_search_widgets(self, *_):

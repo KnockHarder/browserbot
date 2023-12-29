@@ -1,9 +1,8 @@
 import argparse
-import os.path
 import shlex
 import urllib.parse as url_parse
 
-from requests import Request
+from requests import Request, PreparedRequest
 
 
 def parse_curl(command: str) -> Request:
@@ -67,6 +66,18 @@ def _set_url_encode_data(args, req):
     if form_params:
         req.data = url_parse.urlencode(form_params)
         req.headers['Content-Type'] = 'application/x-www-form-urlencoded'
+
+
+def curl_command_from_request(req: PreparedRequest) -> str:
+    headers = []
+    for k, v in req.headers.items():
+        v = v.replace('"', '\\"')
+        headers.append(f'-H "{k}: {v}"')
+    data_param = ''
+    content_type = req.headers.get('Content-Type')
+    if content_type in ('application/x-www-form-urlencoded', 'application/json'):
+        data_param = f'-d \'{req.body}\''
+    return f'curl -X {req.method} {req.url} {" ".join(headers)} {data_param}'.strip()
 
 
 def main():

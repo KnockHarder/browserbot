@@ -115,22 +115,12 @@
       <property name="bottomMargin">
        <number>0</number>
       </property>
-      <property name="spacing">
+      <property name="horizontalSpacing">
+       <number>5</number>
+      </property>
+      <property name="verticalSpacing">
        <number>0</number>
       </property>
-      <item row="0" column="1">
-       <widget class="QPushButton" name="send_btn">
-        <property name="maximumSize">
-         <size>
-          <width>80</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>发送</string>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="0">
        <widget class="QPushButton" name="place_holder_btn">
         <property name="enabled">
@@ -145,6 +135,32 @@ border: none;</string>
         </property>
         <property name="text">
          <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QPushButton" name="send_btn">
+        <property name="maximumSize">
+         <size>
+          <width>80</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>发送</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QPushButton" name="send_btn_2">
+        <property name="maximumSize">
+         <size>
+          <width>80</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>拷贝为curl</string>
         </property>
        </widget>
       </item>
@@ -383,12 +399,28 @@ border: none;</string>
    <slot>send_request()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>737</x>
-     <y>66</y>
+     <x>789</x>
+     <y>64</y>
     </hint>
     <hint type="destinationlabel">
      <x>891</x>
      <y>63</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>send_btn_2</sender>
+   <signal>clicked()</signal>
+   <receiver>ReqRespFrame</receiver>
+   <slot>copy_request_as_curl()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>655</x>
+     <y>44</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>692</x>
+     <y>-47</y>
     </hint>
    </hints>
   </connection>
@@ -400,5 +432,6 @@ border: none;</string>
   <slot>show_request_headers()</slot>
   <slot>show_response_headers()</slot>
   <slot>show_response_body()</slot>
+  <slot>copy_request_as_curl()</slot>
  </slots>
 </ui>
