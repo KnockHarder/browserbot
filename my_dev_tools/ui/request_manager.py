@@ -195,11 +195,16 @@ class DictTableFrame(QFrame):
 
     @Slot(str)
     def search(self, *_):
+        def _safe_lower(text: str):
+            return text.lower() if text else ''
+        
         tabl_view = self.ui.dict_tabl_view
         model = tabl_view.model()
+        key_search_word = _safe_lower(self.ui.key_search_input.text())
+        value_search_word = _safe_lower(self.ui.value_search_input.text())
         for row in range(model.rowCount()):
-            all_match = (self.ui.key_search_input.text().lower() in self.cell_display_value(row, 0).lower()
-                         and self.ui.value_search_input.text().lower() in self.cell_display_value(row, 1).lower())
+            all_match = (key_search_word in _safe_lower(self.cell_display_value(row, 0))
+                         and value_search_word in _safe_lower(self.cell_display_value(row, 1)))
             tabl_view.setRowHidden(row, not all_match)
 
     def cell_display_value(self, row: int, column: int) -> str:
