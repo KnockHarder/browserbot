@@ -68,7 +68,7 @@
   <customwidget>
    <class>JsonTreeView</class>
    <extends>QTreeView</extends>
-   <header>.request_manager.h</header>
+   <header>.json_tool_frame.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

@@ -7,17 +7,24 @@ import tempfile
 import time
 from asyncio import Task
 from json import JSONDecodeError
-from typing import Optional, Any, Callable, Coroutine
+from typing import Optional, Any, Callable, Coroutine, Sequence
 
-import jsonpath
-from PySide6.QtCore import Slot, Signal, Qt, QPoint
-from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import QFrame, QWidget, QTreeWidgetItem, QApplication, QMessageBox, QMenu, \
-    QInputDialog, QLineEdit, QPushButton
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, Slot, Signal, Qt, QPoint
+from PySide6.QtGui import QColor, QShortcut, QKeySequence
+from PySide6.QtWidgets import (
+    QBoxLayout,
+    QFrame,
+    QTreeView,
+    QWidget,
+    QApplication,
+    QMessageBox,
+    QMenu,
+    QPushButton,
+)
 
 from ..widgets import dialog as my_dialog
 
-JSON_ROOT_PATH = '$'
+JSON_ROOT_PATH = "$"
 
 
 class CancelableTask:
@@ -47,6 +54,7 @@ class JsonToolFrame(QFrame):
         super().__init__(parent)
 
         from ..ui.json_tool_frame_uic import Ui_JsonToolFrame
+
         self.ui = Ui_JsonToolFrame()
         self.ui.setupUi(self)
 
@@ -62,9 +70,13 @@ class JsonToolFrame(QFrame):
                 return
             self.ui.tabWidget.setTabText(index, name)
 
-        my_dialog.show_input_dialog('更改标签名', '新名称', self,
-                                    text_value=self.ui.tabWidget.tabText(index),
-                                    text_value_select_callback=_rename)
+        my_dialog.show_input_dialog(
+            "更改标签名",
+            "新名称",
+            self,
+            text_value=self.ui.tabWidget.tabText(index),
+            text_value_select_callback=_rename,
+        )
 
     def init_task_cancel_shortcut(self):
         def _cancel_task():
@@ -75,7 +87,9 @@ class JsonToolFrame(QFrame):
 
     @Slot()
     def import_from_paste(self):
-        self.add_json_viewer_tab('粘贴内容', lambda: json.loads(QApplication.clipboard().text()))
+        self.add_json_viewer_tab(
+            "粘贴内容", lambda: json.loads(QApplication.clipboard().text())
+        )
 
     def add_json_viewer_tab(self, name: str, data_func: Any):
         tab_widget = self.ui.tabWidget
@@ -88,47 +102,50 @@ class JsonToolFrame(QFrame):
         def _import_from_shell(command: str):
             if not command:
                 return
-            self.add_json_viewer_tab('命令输出', lambda: _get_json_from_shell(command))
+            self.add_json_viewer_tab("命令输出", lambda: _get_json_from_shell(command))
 
         async def _get_json_from_shell(command: str) -> Any:
             with tempfile.TemporaryFile() as out_file:
-                popen = subprocess.Popen(f'{command} && echo done >&2 ', shell=True, stdout=out_file)
+                popen = subprocess.Popen(
+                    f"{command} && echo done >&2 ", shell=True, stdout=out_file
+                )
                 while popen.poll() is None:
                     await asyncio.sleep(1)
                 out_file.seek(0)
-                output = str(out_file.read(), 'utf-8')
+                output = str(out_file.read(), "utf-8")
                 return json.loads(output)
 
-        my_dialog.show_multi_line_input_dialog('执行shell命令', 'command', self,
-                                               text_value_select_callback=_import_from_shell)
+        my_dialog.show_multi_line_input_dialog(
+            "执行shell命令", "command", self, text_value_select_callback=_import_from_shell
+        )
 
     def set_import_enable(self, enable):
         for child in self.children():
-            if isinstance(child, QPushButton) and 'JSON' in child.text():
+            if isinstance(child, QPushButton) and "JSON" in child.text():
                 child.setEnabled(enable)
 
 
 class JsonViewerFrame(QFrame):
-    USER_DATA_ITEM_COL = 0
-    JSON_VALUE_COLUMN = 1
-    JSON_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
-    jsonPathChanged = Signal(str)
     messageChanged = Signal(str)
     jsonChanged = Signal()
     refresh_task: CancelableTask = None
 
-    def __init__(self, parent: Optional[QWidget] = None, *,
-                 data: Any = None,
-                 data_func: Callable[[], Any] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        data: Any = None,
+        data_func: Callable[[], Any] = None,
+    ):
         super().__init__(parent)
 
         from ..ui.json_viewer_frame_uic import Ui_JsonViewerFrame
+
         self.ui = Ui_JsonViewerFrame()
         self.ui.setupUi(self)
 
         self.data = data
         self.data_func = data_func
-        self.init_menu()
         self.init_refreshing_json()
 
     def init_refreshing_json(self):
@@ -137,25 +154,33 @@ class JsonViewerFrame(QFrame):
             if self.refresh_task and self.refresh_task.is_running():
                 self.refresh_task.cancel()
                 while self.refresh_task.is_running():
-                    time.sleep(.1)
+                    time.sleep(0.1)
                 return
             try:
                 data = self.data_func()
             except JSONDecodeError as e:
-                detail = (f'Line: {e.lineno}/{len(e.doc.splitlines())}\n'
-                          f'{e.doc[max(0, e.pos - 10):min(e.pos + 10, len(e.doc))]}')
-                my_dialog.show_message(QMessageBox.Icon.Critical, 'Error', e.msg,
-                                       parent=self,
-                                       detail=detail)
+                detail = (
+                    f"Line: {e.lineno}/{len(e.doc.splitlines())}\n"
+                    f"{e.doc[max(0, e.pos - 10):min(e.pos + 10, len(e.doc))]}"
+                )
+                my_dialog.show_message(
+                    QMessageBox.Icon.Critical,
+                    "Error",
+                    e.msg,
+                    parent=self,
+                    detail=detail,
+                )
                 return
             if not isinstance(data, Coroutine):
                 _set_data_then_fresh(data)
                 self.jsonChanged.emit()
                 return
-            refresh_btn.setText('取消刷新')
-            self.refresh_task = CancelableTask.create_task(f'refresh-json-{self.data_func.__name__}',
-                                                           _wait_data_then_refresh(data),
-                                                           lambda: refresh_btn.setText('刷新'))
+            refresh_btn.setText("取消刷新")
+            self.refresh_task = CancelableTask.create_task(
+                f"refresh-json-{self.data_func.__name__}",
+                _wait_data_then_refresh(data),
+                lambda: refresh_btn.setText("刷新"),
+            )
 
         async def _wait_data_then_refresh(future: Coroutine):
             _set_data_then_fresh(await future)
@@ -164,76 +189,244 @@ class JsonViewerFrame(QFrame):
         def _set_data_then_fresh(data: Any):
             if not data:
                 return
-            self.data = data
-            self.refresh_json_tree(self.ui.json_path_edit_widget.text())
+            self.update_json_tree(data)
             curr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.messageChanged.emit(f'于{curr}刷新')
+            self.messageChanged.emit(f"于{curr}刷新")
 
         if self.data_func:
             _refresh_or_cancel()
             self.ui.refresh_btn.clicked.connect(_refresh_or_cancel)
         else:
             self.ui.refresh_btn.setEnabled(False)
-            self.refresh_json_tree()
+            self.update_json_tree(self.data)
 
-    def refresh_json_tree(self, json_path=JSON_ROOT_PATH):
-        self.update_json_tree(self.data)
-        if json_path:
-            self.jsonPathChanged.emit(json_path)
+    def update_json_tree(self, data: Any):
+        json_data_frame = self.ui.json_data_frame
+        json_data_frame.update_data(data)
+        json_data_frame.search()
 
-    def update_json_tree(self, data: Any, json_path=JSON_ROOT_PATH):
-        tree_widget = self.ui.json_tree_widget
-        tree_widget.clear()
 
-        item = QTreeWidgetItem(tree_widget, [json_path])
-        item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, json_path)
-        tree_widget.addTopLevelItem(item)
-        self.create_sub_items(item, data, json_path)
-        if item.childCount() > 0:
-            item.setExpanded(True)
+class JsonModelItem:
+    def __init__(
+        self,
+        row: int,
+        key: str,
+        value: Any,
+        parent_row: int,
+        parent_item: Optional["JsonModelItem"],
+    ):
+        self.row = row
+        self.key = key
+        self.value = value
+        self.parent_row = parent_row
+        self.parent_item = parent_item
+        self._children: list[JsonModelItem] = (
+            [None] * len(value) if isinstance(value, (list, dict)) else []
+        )
+
+    def child_count(self) -> int:
+        return len(self._children)
+
+    def data(self, index: QModelIndex, role=-1) -> Any:
+        item_data = dict[int, Any]()
+        if index.column() == 0:
+            item_data.update(
+                {
+                    Qt.ItemDataRole.DisplayRole: self.key,
+                    Qt.ItemDataRole.EditRole: self.key,
+                }
+            )
+        elif index.column() == 1:
+            if isinstance(self.value, (list, dict)):
+                item_data.update(
+                    {
+                        Qt.ItemDataRole.DisplayRole: f"<{type(self.value).__name__}({len(self.value)})>",
+                        Qt.ItemDataRole.ForegroundRole: QColor(
+                            Qt.GlobalColor.lightGray
+                        ),
+                    }
+                )
+            elif self.value is not None:
+                item_data.update(
+                    {
+                        Qt.ItemDataRole.DisplayRole: str(self.value),
+                        Qt.ItemDataRole.EditRole: self.value,
+                        Qt.ItemDataRole.ToolTipRole: str(self.value),
+                    }
+                )
+        return item_data.get(role)
+
+    def parent_index(self, model: QAbstractItemModel) -> QModelIndex:
+        return model.createIndex(self.parent_row, 0, self.parent_item)
+
+    def child_item(self, row: int) -> Optional["JsonModelItem"]:
+        if len(self._children) <= row:
+            return None
+        if self._children[row] is not None:
+            return self._children[row]
+        key, value = self.row_kv(row)
+        self._children[row] = JsonModelItem(row, key, value, self.row, self)
+        return self._children[row]
+
+    def row_kv(self, row: int) -> Optional[tuple]:
+        if isinstance(self.value, dict):
+            key_list = sorted(list(self.value.keys()))
+            return key_list[row], self.value[key_list[row]]
+        elif isinstance(self.value, list):
+            return f"[{row}]", self.value[row]
+        return None
+
+
+class JsonItemModel(QAbstractItemModel):
+    def __init__(self, parent: QWidget, data: Any):
+        super().__init__(parent)
+        self.root_item = JsonModelItem(0, "$", data, -1, None)
+
+    def update_data(self, data: Any):
+        self.root_item = JsonModelItem(0, "$", data, -1, None)
+        self.layoutChanged.emit()
+
+    def columnCount(self, parent: QModelIndex = None) -> int:
+        return 2
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if not parent.isValid():
+            return 1
+        parent_item: JsonModelItem = parent.internalPointer()
+        return parent_item.child_count()
+
+    def index(
+        self, row: int, column: int, parent: QModelIndex = QModelIndex()
+    ) -> QModelIndex:
+        if not parent.isValid():
+            item = self.root_item
         else:
-            item.setText(self.JSON_VALUE_COLUMN, str(data))
-        self.search_json(self.ui.search_text_edit_widget.text())
-        tree_widget.resizeColumnToContents(0)
+            parent_item: JsonModelItem = parent.internalPointer()
+            item = parent_item.child_item(row)
+        return self.createIndex(row, column, item)
 
-    def create_sub_items(self, parent: QTreeWidgetItem, data, json_path: str):
-        if isinstance(data, dict):
-            for key, value in data.items():
-                item = QTreeWidgetItem(parent, [key])
-                parent.addChild(item)
-                item_path = f'{json_path}.{key}'
-                item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, item_path)
-                self.create_sub_items(item, value, item_path)
-                if not item.childCount():
-                    item.setText(self.JSON_VALUE_COLUMN, str(value))
-                else:
-                    item.setExpanded(True)
-        elif isinstance(data, list):
-            for index, value in enumerate(data):
-                item = QTreeWidgetItem(parent, [f'[{index}]'])
-                parent.addChild(item)
-                item_path = f'{json_path}[{index}]'
-                item.setData(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE, item_path)
-                self.create_sub_items(item, value, item_path)
-                if not item.childCount():
-                    item.setText(self.JSON_VALUE_COLUMN, str(value))
-                else:
-                    item.setExpanded(True)
+    def parent(self, child: QModelIndex = None) -> QModelIndex:
+        item: JsonModelItem = child.internalPointer()
+        if not item:
+            return QModelIndex()
+        return item.parent_index(self)
 
-    def init_menu(self):
+    def data(self, index: QModelIndex, role=-1) -> Any:
+        item: JsonModelItem = index.internalPointer()
+        return item.data(index, role) if item else None
+
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = -1
+    ) -> Any:
+        if (
+            role == Qt.ItemDataRole.DisplayRole
+            and orientation == Qt.Orientation.Horizontal
+        ):
+            return ("键", "值")[section]
+        return None
+
+
+class JsonTreeView(QTreeView):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._model = JsonItemModel(self, None)
+        self.setModel(self._model)
+        self._model.dataChanged.connect(lambda *args: self.resizeColumnToContents(0))
+        self.setup_menu()
+
+    def update_data(self, data: Any):
+        self._model.update_data(data)
+
+    def recursively_search_columns(
+        self, index: QModelIndex, keywords: Sequence[str]
+    ) -> bool:
+        def _match(_index: QModelIndex):
+            _text = self._model.data(_index, Qt.ItemDataRole.DisplayRole)
+            return _text and keywords[_index.column()].lower() in _text.lower()
+
+        model = self._model
+        if all(
+            map(
+                lambda column: _match(model.index(index.row(), column, index.parent())),
+                range(model.columnCount(index)),
+            )
+        ):
+            self.set_all_show_able(index)
+            self.expand_self_and_collapse_children(index)
+            return True
+
+        if model.rowCount(index):
+            any_child_match = any(
+                list(
+                    map(
+                        lambda child: self.recursively_search_columns(child, keywords),
+                        map(
+                            lambda row: model.index(row, index.column(), index),
+                            range(model.rowCount(index)),
+                        ),
+                    )
+                )
+            )
+        else:
+            any_child_match = False
+        self.setExpanded(index, any_child_match)
+        self.setRowHidden(index.row(), index.parent(), not any_child_match)
+        return any_child_match
+
+    def expand_self_and_collapse_children(self, index: QModelIndex):
+        self.expand(index)
+        model = self._model
+        children = [
+            model.createIndex(i, index.column(), index)
+            for i in range(model.rowCount(index))
+        ]
+        for child in children:
+            self.collapse(child)
+
+    def set_all_show_able(self, index: QModelIndex):
+        model = self._model
+        self.setRowHidden(index.row(), index.parent(), False)
+        children = [
+            model.index(row, index.column(), index)
+            for row in range(model.rowCount(index))
+        ]
+        for child in children:
+            self.set_all_show_able(child)
+
+    def show_children(self, index: QModelIndex):
+        model = self._model
+        children = [
+            model.index(row, index.column(), index)
+            for row in range(model.rowCount(index))
+        ]
+        self.expand(index)
+        for child in children:
+            self.setRowHidden(child.row(), child.parent(), False)
+            self.collapse(child)
+
+    def setup_menu(self):
         def _popup_item_menu(pos: QPoint):
-            item = widget.itemAt(pos)
-            if not item:
+            index = self.indexAt(pos)
+            if not (index and index.isValid()):
                 return
-            menu = QMenu()
-            menu.addAction('Focus').triggered.connect(lambda: self.focus_item(item))
-            menu.addAction('Show Descendants').triggered.connect(lambda: self.show_and_expand_recursively(item))
-            menu.addAction('Go path').triggered.connect(lambda: self.input_and_go_json_path(item))
-            menu.addAction('Copy Key').triggered.connect(lambda: _copy_to_clipboard(item.text(0)))
-            menu.addAction("Copy Value").triggered.connect(lambda: _copy_to_clipboard(item.text(1)))
-            menu.addAction("Copy JSON Value").triggered.connect(lambda: _copy_to_clipboard(
-                self._item_json_value(item)))
-            menu.exec(widget.mapToGlobal(pos))
+            menu = QMenu(self)
+            menu.addAction("Copy").triggered.connect(
+                lambda: _copy_to_clipboard(
+                    self.model().data(index, Qt.ItemDataRole.EditRole)
+                )
+            )
+            menu.addAction("Show Children").triggered.connect(
+                lambda: self.show_children(index)
+            )
+            item = index.internalPointer()
+            if isinstance(item, JsonModelItem):
+                menu.addAction("Copy JSON Value").triggered.connect(
+                    lambda: _copy_to_clipboard(item.value)
+                )
+                menu.addAction("Show Value As New Frame").triggered.connect(
+                    lambda: _show_value_as_new_frame(item.key, item.value)
+                )
+            menu.exec(self.mapToGlobal(pos))
             menu.deleteLater()
 
         def _copy_to_clipboard(content):
@@ -243,81 +436,65 @@ class JsonViewerFrame(QFrame):
                 content = str(content)
             QApplication.clipboard().setText(content)
 
-        widget = self.ui.json_tree_widget
-        widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        widget.customContextMenuRequested.connect(_popup_item_menu)
+        def _show_value_as_new_frame(json_key, json_value: Any):
+            frame = JsonDataFrame(json_value, self)
+            frame.setWindowFlag(Qt.WindowType.Window)
+            frame.setWindowTitle(f"响应体: key={json_key}")
+            frame.setFixedSize(800, 600)
+            frame.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+            frame.show()
 
-    def _item_json_value(self, item: QTreeWidgetItem):
-        json_path = item.data(0, self.JSON_PATH_ROLE)
-        if JSON_ROOT_PATH == json_path:
-            return self.data
-        return jsonpath.jsonpath(self.data, json_path)[0]
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(_popup_item_menu)
 
-    def show_and_expand_recursively(self, item: QTreeWidgetItem):
-        item.setExpanded(True)
-        item.setHidden(False)
-        for i in range(item.childCount()):
-            self.show_and_expand_recursively(item.child(i))
+    def search(self, key_search_word: str, value_search_word: str):
+        model: JsonItemModel = self.model()
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            self.recursively_search_columns(
+                index,
+                [key_search_word, value_search_word],
+            )
 
-    @Slot(str)
-    def search_json(self, key: str):
-        tree_widget = self.ui.json_tree_widget
-        for index in range(tree_widget.topLevelItemCount()):
-            item = tree_widget.topLevelItem(index)
-            item.setHidden(self.non_child_match(key, item))
-        tree_widget.resizeColumnToContents(0)
 
-    def non_child_match(self, key: str, parent: QTreeWidgetItem):
-        non_child_match = True
-        if parent.childCount():
-            for i in range(parent.childCount()):
-                child = parent.child(i)
-                child.setHidden(self.non_child_match(key, child))
-                non_child_match &= child.isHidden()
-        if non_child_match:
-            any_match = any(map(lambda x: x and key.lower() in x.lower(),
-                                [parent.text(i) for i in range(parent.columnCount())]))
-            return not any_match
-        else:
-            return False
+class JsonDataFrame(QFrame):
+    def __init__(self, data: Any = dict(), parent: Optional[QWidget] = None):
+        super().__init__(parent)
 
-    def focus_item(self, item: QTreeWidgetItem):
-        json_path = item.data(0, self.JSON_PATH_ROLE)
-        self.go_json_path(json_path)
+        from .simple_json_frame_uic import Ui_Frame
 
-    def input_and_go_json_path(self, item: QTreeWidgetItem):
-        json_path = item.data(0, self.JSON_PATH_ROLE)
-        json_path = json_path if json_path else ''
-        json_path, confirmed = QInputDialog.getText(
-            self.ui.json_tree_widget, '输入JSON Path', 'Path', QLineEdit.EchoMode.Normal,
-            json_path, Qt.WindowType.Window)
-        if confirmed:
-            self.go_json_path(json_path)
+        self.ui = Ui_Frame()
+        self.ui.setupUi(self)
+        tree_view = self.ui.json_tree_view
+        tree_view.header().sectionResized.connect(self.resize_search_widgets)
+        tree_view.header().geometriesChanged.connect(self.resize_search_widgets)
+
+        self.update_data(data)
+
+    def update_data(self, data):
+        tree_view = self.ui.json_tree_view
+        tree_view.update_data(data)
+
+        tree_view.expand_self_and_collapse_children(tree_view.model().index(0, 0))
+        tree_view.resizeColumnToContents(0)
+
+    def resize_search_widgets(self, *_):
+        tree_view = self.ui.json_tree_view
+        layout: QBoxLayout = self.ui.search_edits_area_widget.layout()
+        for column in range(tree_view.model().columnCount()):
+            layout.setStretch(column, tree_view.columnWidth(column))
 
     @Slot(str)
-    def go_json_path(self, json_path: str):
-        edit_widget = self.ui.json_path_edit_widget
-        view_root_path = self.ui.json_tree_widget.topLevelItem(0).data(self.USER_DATA_ITEM_COL, self.JSON_PATH_ROLE)
-        if not json_path or view_root_path == json_path:
-            edit_widget.setStyleSheet('')
-            return
-        data = self.data if json_path == JSON_ROOT_PATH else jsonpath.jsonpath(self.data, json_path)
-        data = data[0] if isinstance(data, list) and len(data) == 1 else data
-        if data:
-            self.update_json_tree(data, json_path)
-            edit_widget.setStyleSheet('')
-            if json_path != edit_widget.text():
-                edit_widget.setText(json_path)
-            return
-        if json_path == edit_widget.text():
-            edit_widget.setStyleSheet('background-color:pink;')
-            return
-        my_dialog.show_message(QMessageBox.Icon.Critical, 'Error', 'JSON Path无有效数据',
-                               parent=self.ui.json_tree_widget)
+    def search(self, *_):
+        key_search_word = self.ui.key_search_edit.text()
+        value_search_word = self.ui.value_search_edit.text()
+        tree_view = self.ui.json_tree_view
+        tree_view.search(key_search_word, value_search_word)
 
 
 def main():
     from PySide6.QtAsyncio import QAsyncioEventLoopPolicy
+
     app = QApplication()
     frame = JsonToolFrame()
     frame.show()
