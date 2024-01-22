@@ -2,13 +2,7 @@
 set -e
 
 projectDir=`pwd`
-
-
-if [ -n "$VIRTUAL_ENV" ]; then
-    # 在虚拟环境中
-    echo "当前处于虚拟环境中，无法正常打包"
-    exit 1
-fi
+ENV_DIR=/tmp/$(uuidgen)
 
 generate_rc_py() {
   RC_FILE=$1
@@ -50,13 +44,10 @@ package_with_setup() {
       exit 1
   fi
   echo "Package with $SETUP_PY"
-  pipenv clean
   echo "Install requirements"
-  python3 -m pip install -r requirements.txt > /dev/null
-  python3 "$SETUP_PY" py2app > py2app.log || true
+  pip install -r requirements.txt > /dev/null
+  python "$SETUP_PY" py2app > py2app.log || true
   rm -rf  build || ture
-  echo "Uninstall requirements"
-  python3 -m pip uninstall -y -r requirements.txt > /dev/null
 
   if [ -f after_package.sh ]; then
       echo "Run after_package.sh"
@@ -66,4 +57,14 @@ package_with_setup() {
 
 
 regenerate_qt_files
+
+pipenv run python -m venv "$ENV_DIR"
+if [ -n "$VIRTUAL_ENV" ]; then
+    # 在虚拟环境中
+    source $VIRTUAL_ENV/bin/activate
+    deactivate
+fi
+source $ENV_DIR/bin/activate
 package_with_setup
+deactivate
+rm -rf "$ENV_DIR"

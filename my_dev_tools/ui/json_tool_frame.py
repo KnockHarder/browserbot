@@ -426,6 +426,10 @@ class JsonTreeView(QTreeView):
                 menu.addAction("Show Value As New Frame").triggered.connect(
                     lambda: _show_value_as_new_frame(item.key, item.value)
                 )
+                if isinstance(item.value, str):
+                    menu.addAction("Parse Value As Json And Show").triggered.connect(
+                        lambda: _show_value_as_new_frame(item.key, json.loads(item.value))
+                    )
             menu.exec(self.mapToGlobal(pos))
             menu.deleteLater()
 

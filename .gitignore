@@ -12,3 +12,5 @@ __pycache__
 *.log
 /after_package.sh
 /.vscode/
+/pyrightconfig.json
+*~
