@@ -494,6 +494,7 @@ class JsonDataFrame(QFrame):
         value_search_word = self.ui.value_search_edit.text()
         tree_view = self.ui.json_tree_view
         tree_view.search(key_search_word, value_search_word)
+        tree_view.resizeColumnToContents(0)
 
 
 def main():

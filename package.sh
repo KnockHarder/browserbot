@@ -2,7 +2,6 @@
 set -e
 
 projectDir=`pwd`
-ENV_DIR=/tmp/$(uuidgen)
 
 generate_rc_py() {
   RC_FILE=$1
@@ -58,6 +57,7 @@ package_with_setup() {
 
 regenerate_qt_files
 
+ENV_DIR=/tmp/$(uuidgen)
 pipenv run python -m venv "$ENV_DIR"
 if [ -n "$VIRTUAL_ENV" ]; then
     # 在虚拟环境中
@@ -65,6 +65,7 @@ if [ -n "$VIRTUAL_ENV" ]; then
     deactivate
 fi
 source $ENV_DIR/bin/activate
+echo "Enter venv: $ENV_DIR"
 package_with_setup
 deactivate
 rm -rf "$ENV_DIR"
