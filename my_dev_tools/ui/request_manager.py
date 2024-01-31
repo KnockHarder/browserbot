@@ -146,7 +146,7 @@ class ReqRespFrame(QFrame):
         content_type = resp.headers.get("Content-Type")
         if content_type:
             self.ui.resp_body_type_label.setText(content_type)
-            if content_type.split(";")[0] == "application/json":
+            if "application/json" in content_type:
                 data = json.loads(resp.text)
                 layout = self.ui.resp_body_area_widget.layout()
                 while layout.count() > 0:
@@ -448,14 +448,16 @@ class ReqBodyFrame(QFrame):
 
     def update_body(self, req: PreparedRequest):
         content_type = req.headers.get("Content-Type")
+        if not content_type or not content_type.strip():
+            return
         tab_widget = self.ui.req_body_tab_widget
         # find tab by text
         for idx in range(tab_widget.count()):
             widget = tab_widget.widget(idx).layout().itemAt(0).widget()
-            if tab_widget.tabText(idx) in content_type.split("/") and hasattr(
+            if tab_widget.tabText(idx) in content_type and hasattr(
                 widget, "__update_body__"
             ):
-                widget.__update_body__(req.body)
+                widget.__update_body__(json.loads(req.body))
                 tab_widget.setCurrentIndex(idx)
                 return
         raise self.UnsupportedContentTypeError(content_type)
@@ -479,6 +481,14 @@ class DictTableBodyFrame(DictTableFrame):
 
     def __body_data__(self) -> Any:
         return super().dict_data()
+
+
+class JsonBodyFrame(JsonDataFrame):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__({}, parent)
+
+    def __update_body__(self, data: Any):
+        self.update_data(data)
 
 
 def main():

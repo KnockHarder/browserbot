@@ -170,7 +170,7 @@ border: none;</string>
    <item>
     <widget class="QTabWidget" name="main_tab_widget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>5</number>
      </property>
      <property name="documentMode">
       <bool>true</bool>
@@ -340,7 +340,7 @@ border: none;</string>
           <string notr="true">padding-left: 10px;</string>
          </property>
          <property name="text">
-          <string>json</string>
+          <string>application/json</string>
          </property>
         </widget>
        </item>
