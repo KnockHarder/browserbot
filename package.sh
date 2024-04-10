@@ -37,15 +37,15 @@ regenerate_qt_files() {
 
 package_with_setup() {
   cd "$projectDir"
-  SETUP_PY=$(find . -name 'setup.py' | head -n 1)
+  SETUP_PY=$(find . -name 'setup.py' | grep -v 'dist/' | head -n 1)
   if [ -z "$SETUP_PY" ]; then
       echo "setup.py not found"
       exit 1
   fi
-  echo "Package with $SETUP_PY"
   echo "Install requirements"
-  pip install -r requirements.txt > /dev/null
-  python "$SETUP_PY" py2app > py2app.log || true
+  pip install -r requirements.txt > install_requirements.log 2> install_requirements.error
+  echo "Package with $SETUP_PY"
+  python "$SETUP_PY" py2app > py2app.log 2> py2app.error || true
   rm -rf  build || ture
 
   if [ -f after_package.sh ]; then

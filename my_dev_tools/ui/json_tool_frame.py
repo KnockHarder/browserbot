@@ -116,7 +116,10 @@ class JsonToolFrame(QFrame):
                 return json.loads(output)
 
         my_dialog.show_multi_line_input_dialog(
-            "执行shell命令", "command", self, text_value_select_callback=_import_from_shell
+            "执行shell命令",
+            "command",
+            self,
+            text_value_select_callback=_import_from_shell,
         )
 
     def set_import_enable(self, enable):
@@ -249,7 +252,7 @@ class JsonModelItem:
             elif self.value is not None:
                 item_data.update(
                     {
-                        Qt.ItemDataRole.DisplayRole: str(self.value),
+                        Qt.ItemDataRole.DisplayRole: str(self.value)[0:200],
                         Qt.ItemDataRole.EditRole: self.value,
                         Qt.ItemDataRole.ToolTipRole: str(self.value),
                     }
@@ -332,6 +335,8 @@ class JsonTreeView(QTreeView):
         self._model = JsonItemModel(self, None)
         self.setModel(self._model)
         self._model.dataChanged.connect(lambda *args: self.resizeColumnToContents(0))
+        self.expanded.connect(lambda *args: self.resizeColumnToContents(0))
+        self.collapsed.connect(lambda *args: self.resizeColumnToContents(0))
         self.setup_menu()
 
     def update_data(self, data: Any):
@@ -428,7 +433,9 @@ class JsonTreeView(QTreeView):
                 )
                 if isinstance(item.value, str):
                     menu.addAction("Parse Value As Json And Show").triggered.connect(
-                        lambda: _show_value_as_new_frame(item.key, json.loads(item.value))
+                        lambda: _show_value_as_new_frame(
+                            item.key, json.loads(item.value)
+                        )
                     )
             menu.exec(self.mapToGlobal(pos))
             menu.deleteLater()
