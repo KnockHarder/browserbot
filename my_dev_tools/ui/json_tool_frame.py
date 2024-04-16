@@ -330,14 +330,22 @@ class JsonItemModel(QAbstractItemModel):
 
 
 class JsonTreeView(QTreeView):
+    latest_resize_timestamp: float = 0
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._model = JsonItemModel(self, None)
         self.setModel(self._model)
-        self._model.dataChanged.connect(lambda *args: self.resizeColumnToContents(0))
-        self.expanded.connect(lambda *args: self.resizeColumnToContents(0))
-        self.collapsed.connect(lambda *args: self.resizeColumnToContents(0))
+        self._model.dataChanged.connect(lambda *args: self.resize_columns())
+        self.expanded.connect(lambda *args: self.resize_columns())
+        self.collapsed.connect(lambda *args: self.resize_columns())
         self.setup_menu()
+
+    def resize_columns(self):
+        if time.perf_counter() - self.latest_resize_timestamp < 0.3:
+            return
+        self.resizeColumnToContents(0)
+        self.latest_resize_timestamp = time.perf_counter()
 
     def update_data(self, data: Any):
         self._model.update_data(data)
